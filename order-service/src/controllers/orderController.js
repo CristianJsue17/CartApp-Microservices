@@ -4,176 +4,205 @@ const { v4: uuidv4 } = require('uuid');
 /**
  * Crear orden y descontar stock de componentes automáticamente
  * POST /api/orders
+ * Body: { userId, configId, quantity }
  * 
- * Este es el endpoint más importante del sistema:
- * 1. Crea la orden
- * 2. Por cada configuración comprada, obtiene sus componentes
- * 3. Descuenta el stock de cada componente (usando transacciones atómicas)
- * 4. Crea un registro de reserva con los componentes descontados
+ * Este endpoint:
+ * 1. Crea la orden de UNA computadora
+ * 2. Obtiene los componentes de esa computadora
+ * 3. Descuenta el stock de cada componente automáticamente
  */
 exports.createOrder = async (req, res) => {
   try {
-    const { userId, items } = req.body; // items: [{ configId, quantity, price }]
+    const { userId, configId, quantity } = req.body;
     
     // Validar datos requeridos
-    if (!userId || !items || items.length === 0) {
+    if (!userId || !configId || !quantity) {
       return res.status(400).json({ 
-        error: 'Faltan campos requeridos: userId, items' 
+        error: 'Faltan campos requeridos: userId, configId, quantity' 
       });
     }
 
+    if (quantity <= 0) {
+      return res.status(400).json({ 
+        error: 'La cantidad debe ser mayor a 0' 
+      });
+    }
+
+    // Obtener el precio y nombre de la configuración desde DynamoDB
+    const configParams = {
+      TableName: tableName,
+      Key: {
+        PK: `CONFIG#${configId}`,
+        SK: 'METADATA'
+      }
+    };
+
+    const configResult = await dynamoDB.get(configParams).promise();
+    
+    if (!configResult.Item) {
+      return res.status(404).json({ 
+        success: false,
+        error: 'Configuración no encontrada' 
+      });
+    }
+
+    const configPrice = configResult.Item.price;
+    const configName = configResult.Item.name;
+    const total = configPrice * quantity;
+
     // Generar ID único para la orden
     const orderId = uuidv4();
-    const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    console.log(`\n🛒 Iniciando orden ${orderId}`);
+    console.log(`📱 Usuario: ${userId}`);
+    console.log(`💻 Computadora: ${configName}`);
+    console.log(`📊 Cantidad: ${quantity}`);
+    console.log(`💰 Total: $${total.toFixed(2)}\n`);
 
     // 1. Crear metadata de la orden
     const orderMetadata = {
       TableName: tableName,
       Item: {
-        PK: `ORDER#${orderId}`,
-        SK: 'METADATA',
+        PK: `USER#${userId}`,
+        SK: `ORDER#${orderId}`,
         Type: 'order',
+        orderId,
         userId,
-        total,
-        status: 'pending',
-        date: new Date().toISOString(),
-        itemCount: items.length
+        configId,
+        configName,
+        quantity,
+        totalPrice: total,
+        status: 'completed',
+        createdAt: new Date().toISOString()
       }
     };
     await dynamoDB.put(orderMetadata).promise();
 
-    console.log(`✅ Orden creada: ${orderId}`);
+    console.log(`✅ Orden registrada en la base de datos`);
 
-    // 2. Procesar cada item de la orden
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-
-      // Validar item
-      if (!item.configId || !item.quantity || !item.price) {
-        throw new Error(`Item ${i + 1} inválido: falta configId, quantity o price`);
+    // 2. Obtener componentes de la configuración
+    const componentsParams = {
+      TableName: tableName,
+      KeyConditionExpression: 'PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': `CONFIG#${configId}`
       }
+    };
+    
+    const componentsResult = await dynamoDB.query(componentsParams).promise();
+    const components = componentsResult.Items.filter(c => c.Type === 'composition');
 
-      // Guardar item de orden
-      const orderItem = {
-        TableName: tableName,
-        Item: {
-          PK: `ORDER#${orderId}`,
-          SK: `ITEM#${i + 1}`,
-          Type: 'order_item',
-          configId: item.configId,
-          quantity: item.quantity,
-          price: item.price,
-          subtotal: item.price * item.quantity
-        }
-      };
-      await dynamoDB.put(orderItem).promise();
-
-      console.log(`📝 Item ${i + 1} guardado: ${item.configId} x${item.quantity}`);
-
-      // Obtener componentes de la configuración desde DynamoDB
-      const configParams = {
-        TableName: tableName,
-        KeyConditionExpression: 'PK = :pk',
-        ExpressionAttributeValues: {
-          ':pk': `CONFIG#${item.configId}`
-        }
-      };
-      
-      const configResult = await dynamoDB.query(configParams).promise();
-      const components = configResult.Items.filter(c => c.Type === 'composition');
-
-      if (components.length === 0) {
-        throw new Error(`La configuración ${item.configId} no tiene componentes definidos`);
-      }
-
-      console.log(`🔍 Componentes encontrados para ${item.configId}: ${components.length}`);
-
-      // Array para almacenar componentes reservados
-      const componentsToReserve = [];
-
-      // 3. Descontar stock de cada componente
-      for (const comp of components) {
-        const componentId = comp.SK.replace('COMPONENT#', '');
-        const requiredQty = comp.quantity * item.quantity; // cantidad por config * cantidad de configs
-
-        console.log(`📦 Descontando ${requiredQty} unidades de ${componentId}...`);
-
-        // Usar UpdateExpression con ConditionExpression para descuento atómico
-        const updateParams = {
-          TableName: tableName,
-          Key: {
-            PK: `COMPONENT#${componentId}`,
-            SK: 'METADATA'
-          },
-          UpdateExpression: 'SET stock = stock - :qty',
-          ConditionExpression: 'stock >= :qty', // Solo descuenta si hay suficiente stock
-          ExpressionAttributeValues: {
-            ':qty': requiredQty
-          },
-          ReturnValues: 'ALL_NEW'
-        };
-
-        try {
-          const updateResult = await dynamoDB.update(updateParams).promise();
-          
-          componentsToReserve.push({
-            id: componentId,
-            name: updateResult.Attributes.name,
-            qtyReserved: requiredQty,
-            newStock: updateResult.Attributes.stock
-          });
-
-          console.log(`✅ Stock descontado: ${componentId} - Nuevo stock: ${updateResult.Attributes.stock}`);
-
-        } catch (error) {
-          // Si falla el descuento (stock insuficiente), revertir la orden
-          if (error.code === 'ConditionalCheckFailedException') {
-            console.error(`❌ Stock insuficiente para ${componentId}`);
-            
-            // Aquí podrías implementar rollback de la orden
-            return res.status(400).json({ 
-              success: false,
-              error: 'Stock insuficiente', 
-              component: componentId,
-              required: requiredQty,
-              message: `No hay suficiente stock del componente ${componentId}. Se requieren ${requiredQty} unidades.`
-            });
-          }
-          throw error; // Re-lanzar otros errores
-        }
-      }
-
-      // 4. Crear registro de reserva (tracking de qué se descontó)
-      const reservationId = `R-${uuidv4().substring(0, 8).toUpperCase()}`;
-      const reservationParams = {
-        TableName: tableName,
-        Item: {
-          PK: `ORDER#${orderId}`,
-          SK: `RESERVATION#${reservationId}`,
-          Type: 'reservation',
-          configId: item.configId,
-          components: componentsToReserve,
-          status: 'reserved',
-          createdAt: new Date().toISOString()
-        }
-      };
-      await dynamoDB.put(reservationParams).promise();
-
-      console.log(`🎫 Reserva creada: ${reservationId}`);
+    if (components.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: `La configuración ${configId} no tiene componentes definidos` 
+      });
     }
 
+    console.log(`🔍 Componentes encontrados: ${components.length}\n`);
+
+    // Array para almacenar componentes reservados
+    const componentsReserved = [];
+
+    // 3. Descontar stock de cada componente
+    for (const comp of components) {
+      const componentId = comp.SK.replace('COMPONENT#', '');
+      const requiredQty = comp.quantity * quantity; // cantidad por config * cantidad de configs compradas
+
+      console.log(`📦 Procesando: ${componentId}`);
+      console.log(`   Cantidad requerida: ${requiredQty} unidades`);
+
+      // Usar UpdateExpression con ConditionExpression para descuento atómico
+      const updateParams = {
+        TableName: tableName,
+        Key: {
+          PK: `COMPONENT#${componentId}`,
+          SK: 'METADATA'
+        },
+        UpdateExpression: 'SET stock = stock - :qty, updatedAt = :updatedAt',
+        ConditionExpression: 'stock >= :qty', // Solo descuenta si hay suficiente stock
+        ExpressionAttributeValues: {
+          ':qty': requiredQty,
+          ':updatedAt': new Date().toISOString()
+        },
+        ReturnValues: 'ALL_NEW'
+      };
+
+      try {
+        const updateResult = await dynamoDB.update(updateParams).promise();
+        
+        componentsReserved.push({
+          componentId: componentId,
+          componentName: updateResult.Attributes.name,
+          quantityUsed: requiredQty,
+          stockBefore: updateResult.Attributes.stock + requiredQty,
+          stockAfter: updateResult.Attributes.stock,
+          pricePerUnit: updateResult.Attributes.price
+        });
+
+        console.log(`   ✅ Stock descontado exitosamente`);
+        console.log(`   📉 Stock anterior: ${updateResult.Attributes.stock + requiredQty}`);
+        console.log(`   📊 Stock actual: ${updateResult.Attributes.stock}\n`);
+
+      } catch (error) {
+        // Si falla el descuento (stock insuficiente)
+        if (error.code === 'ConditionalCheckFailedException') {
+          console.error(`   ❌ Stock insuficiente para ${componentId}\n`);
+          
+          // Obtener stock actual para mostrar en el error
+          const stockCheckParams = {
+            TableName: tableName,
+            Key: {
+              PK: `COMPONENT#${componentId}`,
+              SK: 'METADATA'
+            }
+          };
+          const stockCheck = await dynamoDB.get(stockCheckParams).promise();
+          const currentStock = stockCheck.Item ? stockCheck.Item.stock : 0;
+          
+          return res.status(400).json({ 
+            success: false,
+            error: 'Stock insuficiente', 
+            component: stockCheck.Item ? stockCheck.Item.name : componentId,
+            required: requiredQty,
+            available: currentStock,
+            message: `No hay suficiente stock de "${stockCheck.Item ? stockCheck.Item.name : componentId}". Necesitas ${requiredQty} unidades pero solo hay ${currentStock} disponibles.`
+          });
+        }
+        throw error; // Re-lanzar otros errores
+      }
+    }
+
+    // 4. Crear registro de componentes usados (para auditoría)
+    const componentsRecordParams = {
+      TableName: tableName,
+      Item: {
+        PK: `USER#${userId}`,
+        SK: `ORDER#${orderId}#COMPONENTS`,
+        Type: 'order_components',
+        orderId,
+        components: componentsReserved,
+        createdAt: new Date().toISOString()
+      }
+    };
+    await dynamoDB.put(componentsRecordParams).promise();
+
     console.log(`🎉 Orden ${orderId} completada exitosamente`);
+    console.log(`═══════════════════════════════════════════════\n`);
 
     res.status(201).json({ 
       success: true,
-      message: 'Orden creada exitosamente y stock descontado',
+      message: `Orden creada exitosamente. Se compraron ${quantity} unidad(es) de ${configName}`,
       order: {
         orderId,
         userId,
-        total,
-        status: 'pending',
-        itemCount: items.length,
-        date: new Date().toISOString()
+        configId,
+        configName,
+        quantity,
+        totalPrice: total,
+        status: 'completed',
+        componentsUsed: componentsReserved,
+        createdAt: new Date().toISOString()
       }
     });
 
@@ -195,16 +224,20 @@ exports.getOrderById = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // Query para obtener todos los registros de la orden
+    // Scan para buscar la orden (ya que ahora PK es USER#userId)
     const params = {
       TableName: tableName,
-      KeyConditionExpression: 'PK = :pk',
+      FilterExpression: 'orderId = :orderId AND #type = :orderType',
+      ExpressionAttributeNames: {
+        '#type': 'Type'
+      },
       ExpressionAttributeValues: {
-        ':pk': `ORDER#${orderId}`
+        ':orderId': orderId,
+        ':orderType': 'order'
       }
     };
 
-    const result = await dynamoDB.query(params).promise();
+    const result = await dynamoDB.scan(params).promise();
 
     if (result.Items.length === 0) {
       return res.status(404).json({ 
@@ -213,16 +246,28 @@ exports.getOrderById = async (req, res) => {
       });
     }
 
-    // Separar por tipo de registro
-    const metadata = result.Items.find(item => item.SK === 'METADATA');
-    const items = result.Items.filter(item => item.Type === 'order_item');
-    const reservations = result.Items.filter(item => item.Type === 'reservation');
+    const order = result.Items[0];
+
+    // Buscar componentes usados
+    const componentsParams = {
+      TableName: tableName,
+      FilterExpression: 'orderId = :orderId AND #type = :compType',
+      ExpressionAttributeNames: {
+        '#type': 'Type'
+      },
+      ExpressionAttributeValues: {
+        ':orderId': orderId,
+        ':compType': 'order_components'
+      }
+    };
+
+    const componentsResult = await dynamoDB.scan(componentsParams).promise();
+    const components = componentsResult.Items[0] ? componentsResult.Items[0].components : [];
 
     res.json({ 
       success: true,
-      order: metadata,
-      items,
-      reservations
+      order,
+      componentsUsed: components
     });
 
   } catch (error) {
@@ -243,13 +288,12 @@ exports.getAllOrders = async (req, res) => {
   try {
     const params = {
       TableName: tableName,
-      FilterExpression: '#type = :orderType AND SK = :metadata',
+      FilterExpression: '#type = :orderType',
       ExpressionAttributeNames: {
         '#type': 'Type'
       },
       ExpressionAttributeValues: {
-        ':orderType': 'order',
-        ':metadata': 'METADATA'
+        ':orderType': 'order'
       }
     };
 
@@ -259,7 +303,7 @@ exports.getAllOrders = async (req, res) => {
       success: true,
       count: result.Items.length,
       orders: result.Items.sort((a, b) => 
-        new Date(b.date) - new Date(a.date) // Ordenar por fecha descendente
+        new Date(b.createdAt) - new Date(a.createdAt) // Ordenar por fecha descendente
       )
     });
 
@@ -283,25 +327,24 @@ exports.getOrdersByUser = async (req, res) => {
 
     const params = {
       TableName: tableName,
-      FilterExpression: '#type = :orderType AND SK = :metadata AND userId = :userId',
-      ExpressionAttributeNames: {
-        '#type': 'Type'
-      },
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
       ExpressionAttributeValues: {
-        ':orderType': 'order',
-        ':metadata': 'METADATA',
-        ':userId': userId
+        ':pk': `USER#${userId}`,
+        ':sk': 'ORDER#'
       }
     };
 
-    const result = await dynamoDB.scan(params).promise();
+    const result = await dynamoDB.query(params).promise();
     
+    // Filtrar solo las órdenes (no los componentes)
+    const orders = result.Items.filter(item => item.Type === 'order');
+
     res.json({ 
       success: true,
       userId,
-      count: result.Items.length,
-      orders: result.Items.sort((a, b) => 
-        new Date(b.date) - new Date(a.date)
+      count: orders.length,
+      orders: orders.sort((a, b) => 
+        new Date(b.createdAt) - new Date(a.createdAt)
       )
     });
 

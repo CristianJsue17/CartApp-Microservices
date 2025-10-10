@@ -54,8 +54,9 @@ exports.createConfig = async (req, res) => {
         price,
         description,
         components 
-      } 
+      }
     });
+
   } catch (error) {
     console.error('Error al crear configuración:', error);
     res.status(500).json({ error: error.message });
@@ -63,7 +64,7 @@ exports.createConfig = async (req, res) => {
 };
 
 /**
- * Obtener todas las configuraciones
+ * Obtener todas las configuraciones (solo metadata)
  * GET /api/configs
  */
 exports.getAllConfigs = async (req, res) => {
@@ -81,12 +82,13 @@ exports.getAllConfigs = async (req, res) => {
     };
 
     const result = await dynamoDB.scan(params).promise();
-    
+        
     res.json({ 
       success: true,
       count: result.Items.length,
-      configs: result.Items 
+      configs: result.Items
     });
+
   } catch (error) {
     console.error('Error al obtener configuraciones:', error);
     res.status(500).json({ error: error.message });
@@ -94,13 +96,13 @@ exports.getAllConfigs = async (req, res) => {
 };
 
 /**
- * Obtener configuración por ID con sus componentes
+ * Obtener configuración por ID con sus componentes (CON DETALLES COMPLETOS)
  * GET /api/configs/:id
  */
 exports.getConfigById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+        
     const params = {
       TableName: tableName,
       KeyConditionExpression: 'PK = :pk',
@@ -110,7 +112,7 @@ exports.getConfigById = async (req, res) => {
     };
 
     const result = await dynamoDB.query(params).promise();
-    
+        
     if (result.Items.length === 0) {
       return res.status(404).json({ 
         success: false,
@@ -120,18 +122,102 @@ exports.getConfigById = async (req, res) => {
 
     // Separar metadata de componentes
     const metadata = result.Items.find(item => item.SK === 'METADATA');
-    const components = result.Items.filter(item => item.Type === 'composition');
+    const compositions = result.Items.filter(item => item.Type === 'composition');
+
+    // Obtener detalles completos de cada componente
+    const componentsWithDetails = [];
+    
+    for (const comp of compositions) {
+      const componentId = comp.SK.replace('COMPONENT#', '');
+      
+      // Buscar los detalles del componente
+      const componentParams = {
+        TableName: tableName,
+        Key: {
+          PK: `COMPONENT#${componentId}`,
+          SK: 'METADATA'
+        }
+      };
+      
+      const componentResult = await dynamoDB.get(componentParams).promise();
+      
+      if (componentResult.Item) {
+        componentsWithDetails.push({
+          quantity: comp.quantity,
+          component: componentResult.Item
+        });
+      }
+    }
 
     res.json({ 
       success: true,
-      config: metadata, 
-      components: components.map(c => ({
-        componentId: c.SK.replace('COMPONENT#', ''),
-        quantity: c.quantity
-      }))
+      config: metadata,
+      components: componentsWithDetails
     });
+
   } catch (error) {
     console.error('Error al obtener configuración:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Obtener todas las configuraciones CON conteo de componentes
+ * GET /api/catalog/configs
+ */
+exports.getAllConfigsWithComponentCount = async (req, res) => {
+  try {
+    // 1. Obtener todas las configs
+    const configsParams = {
+      TableName: tableName,
+      FilterExpression: '#type = :configType AND SK = :metadata',
+      ExpressionAttributeNames: {
+        '#type': 'Type'
+      },
+      ExpressionAttributeValues: {
+        ':configType': 'config',
+        ':metadata': 'METADATA'
+      }
+    };
+
+    const configsResult = await dynamoDB.scan(configsParams).promise();
+    
+    // 2. Para cada config, contar sus componentes
+    const configsWithComponentCount = [];
+    
+    for (const config of configsResult.Items) {
+      const configId = config.PK.replace('CONFIG#', '');
+      
+      // Contar composiciones
+      const compositionsParams = {
+        TableName: tableName,
+        KeyConditionExpression: 'PK = :pk',
+        FilterExpression: '#type = :compType',
+        ExpressionAttributeNames: {
+          '#type': 'Type'
+        },
+        ExpressionAttributeValues: {
+          ':pk': `CONFIG#${configId}`,
+          ':compType': 'composition'
+        }
+      };
+      
+      const compositionsResult = await dynamoDB.query(compositionsParams).promise();
+      
+      configsWithComponentCount.push({
+        ...config,
+        componentCount: compositionsResult.Items.length
+      });
+    }
+        
+    res.json({ 
+      success: true,
+      count: configsWithComponentCount.length,
+      configs: configsWithComponentCount
+    });
+
+  } catch (error) {
+    console.error('Error al obtener configuraciones con componentes:', error);
     res.status(500).json({ error: error.message });
   }
 };
