@@ -3,9 +3,9 @@
 // Las IPs cambian cada vez que haces terraform apply
 
 const API_CONFIG = {
-  CATALOG_SERVICE: 'http://54.242.254.4:3001',  // ⬅️ CAMBIAR ESTA IP
-  CART_SERVICE: 'http://54.242.254.4:3002',     // ⬅️ CAMBIAR ESTA IP
-  ORDER_SERVICE: 'http://54.242.254.4:3003'     // ⬅️ CAMBIAR ESTA IP
+  CATALOG_SERVICE: 'http://54.144.73.21:3001',  // ⬅️ CAMBIAR ESTA IP
+  CART_SERVICE: 'http://54.144.73.21:3002',     // ⬅️ CAMBIAR ESTA IP
+  ORDER_SERVICE: 'http://54.144.73.21:3003'     // ⬅️ CAMBIAR ESTA IP
 };
 
 // Usuario actual (simulado - en producción vendría de autenticación)
@@ -79,4 +79,96 @@ function formatSpecs(specs) {
   return Object.entries(specs)
     .map(([key, value]) => `<span class="badge bg-light text-dark me-1 mb-1">${key}: ${value}</span>`)
     .join('');
+}
+
+// ==========================================
+// CARRITO DE COMPRAS EN MEMORIA
+// ==========================================
+let cart = [];
+
+// Agregar item al carrito
+function addToCart(configId, configName, configPrice) {
+  const existingItem = cart.find(item => item.configId === configId);
+  
+  if (existingItem) {
+    existingItem.quantity += 1;
+    showNotification(`Se agregó otra unidad de ${configName} al carrito`, 'success');
+  } else {
+    cart.push({
+      configId,
+      configName,
+      configPrice,
+      quantity: 1
+    });
+    showNotification(`${configName} agregado al carrito`, 'success');
+  }
+  
+  updateCartBadge();
+  saveCartToLocalStorage();
+}
+
+// Eliminar item del carrito
+function removeFromCart(configId) {
+  const index = cart.findIndex(item => item.configId === configId);
+  if (index > -1) {
+    const itemName = cart[index].configName;
+    cart.splice(index, 1);
+    showNotification(`${itemName} eliminado del carrito`, 'info');
+    updateCartBadge();
+    saveCartToLocalStorage();
+    loadCart();
+  }
+}
+
+// Actualizar cantidad en el carrito
+function updateCartQuantity(configId, newQuantity) {
+  const item = cart.find(item => item.configId === configId);
+  if (item) {
+    item.quantity = Math.max(1, Math.min(10, newQuantity));
+    updateCartBadge();
+    saveCartToLocalStorage();
+    loadCart();
+  }
+}
+
+// Vaciar carrito
+function clearCart() {
+  cart = [];
+  updateCartBadge();
+  saveCartToLocalStorage();
+  showNotification('Carrito vaciado', 'info');
+}
+
+// Actualizar badge del carrito
+function updateCartBadge() {
+  const badge = document.getElementById('cartBadge');
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  
+  if (badge) {
+    if (totalItems > 0) {
+      badge.textContent = totalItems;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+// Calcular total del carrito
+function getCartTotal() {
+  return cart.reduce((sum, item) => sum + (item.configPrice * item.quantity), 0);
+}
+
+// Guardar carrito en localStorage
+function saveCartToLocalStorage() {
+  localStorage.setItem('appCarritoCart', JSON.stringify(cart));
+}
+
+// Cargar carrito desde localStorage
+function loadCartFromLocalStorage() {
+  const saved = localStorage.getItem('appCarritoCart');
+  if (saved) {
+    cart = JSON.parse(saved);
+    updateCartBadge();
+  }
 }

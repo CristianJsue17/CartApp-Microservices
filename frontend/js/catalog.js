@@ -10,7 +10,7 @@ async function loadConfigs() {
   try {
     showLoading('configsContainer');
     
-    const response = await axios.get(`${API_CONFIG.CATALOG_SERVICE}/api/catalog/configs`);
+    const response = await axios.get(`${API_CONFIG.CATALOG_SERVICE}/api/configs`);
     allConfigs = response.data.configs || [];
     
     container.innerHTML = '';
@@ -98,7 +98,10 @@ function createConfigCard(config) {
           </div>
           
           <div class="d-grid gap-2">
-            <button class="btn btn-primary" onclick="viewConfigDetails('${configId}')">
+            <button class="btn btn-success mb-2" onclick="addToCart('${configId}', '${config.name}', ${config.price})">
+              <i class="bi bi-cart-plus"></i> Agregar al Carrito
+            </button>
+            <button class="btn btn-outline-primary" onclick="viewConfigDetails('${configId}')">
               <i class="bi bi-eye"></i> Ver Detalles
             </button>
           </div>

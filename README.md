@@ -1,277 +1,143 @@
-# 🛒 Sistema de Carrito de Compras - Microservicios
+# 🛒 App Carrito - E-Commerce de Computadoras
 
-Sistema de e-commerce con arquitectura de microservicios usando Node.js, Express y DynamoDB.
+Sistema de e-commerce con arquitectura de microservicios para venta de computadoras con descuento automático de componentes.
 
-## 📁 Estructura del Proyecto
+## 🚀 Tecnologías
 
-```
-APP CARRITO/
-├── catalog-service/          # Puerto 3001 - Gestión de catálogo
-├── cart-service/             # Puerto 3002 - Carrito de compras
-├── order-service/            # Puerto 3003 - Gestión de órdenes
-├── create-dynamodb-table.js  # Script para crear tabla
-├── seed-data.js              # Script para datos de prueba
-├── package.json              # Dependencias raíz
-└── README.md                 # Este archivo
-```
+- **Backend:** Node.js + Express.js
+- **Base de Datos:** AWS DynamoDB (Single Table Design)
+- **Infraestructura:** AWS EC2
+- **Frontend:** HTML5 + Bootstrap 5 + Vanilla JavaScript
+- **IaC:** Terraform (repositorio separado)
 
-## 🚀 Instalación Rápida
+---
 
-### 1. Instalar dependencias de todos los servicios
+## 📦 Microservicios
 
-```bash
-npm run setup
-```
+### **1. Catalog Service (Puerto 3001)**
+Gestión de componentes y configuraciones.
 
-O manualmente:
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/components` | Listar componentes |
+| GET | `/api/components/:id` | Obtener componente |
+| GET | `/api/configs` | Listar computadoras |
+| GET | `/api/configs/:id` | Detalles de computadora |
+| GET | `/api/catalog/configs` | Computadoras con conteo |
 
-```bash
-npm install
-cd catalog-service && npm install
-cd ../cart-service && npm install
-cd ../order-service && npm install
-```
+### **2. Cart Service (Puerto 3002)**
+Verificación de disponibilidad de stock.
 
-### 2. Configurar AWS
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/cart/check-availability` | Verificar stock disponible |
 
-Asegúrate de tener configuradas tus credenciales AWS:
+### **3. Order Service (Puerto 3003)**
+Creación de órdenes y descuento automático de stock.
 
-```bash
-aws configure
-```
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/api/orders` | Crear orden (descuenta stock) |
+| GET | `/api/orders` | Listar todas las órdenes |
+| GET | `/api/orders/:orderId` | Obtener orden específica |
+| GET | `/api/orders/user/:userId` | Órdenes por usuario |
 
-O verifica que exista `~/.aws/credentials`
+---
 
-### 3. Crear tabla DynamoDB
+## 🗄️ Base de Datos (DynamoDB)
 
-```bash
-npm run create-table
-```
+**Tabla:** `ecommerce-main-v2` (Single Table Design)
 
-Espera 10-30 segundos hasta que la tabla esté activa.
+| Entidad | PK | SK | Descripción |
+|---------|----|----|-------------|
+| Componente | `COMPONENT#id` | `METADATA` | Stock, precio, specs |
+| Computadora | `CONFIG#id` | `METADATA` | Nombre, precio |
+| Composición | `CONFIG#id` | `COMPONENT#id` | Cantidad por config |
+| Orden | `USER#userId` | `ORDER#orderId` | Orden completada |
 
-### 4. Cargar datos de prueba
+---
 
-```bash
-npm run seed-data
-```
+## ⚙️ Configuración
 
-### 5. Iniciar microservicios
+### **Infraestructura (Terraform)**
+📁 La configuración de Terraform está en un **repositorio separado**.
 
-**Opción A: En terminales separadas**
+### **Frontend (Local)**
+⚠️ **IMPORTANTE:** Actualizar IPs en `frontend/js/config.js` cada vez que se levante la infraestructura:
 
-```bash
-# Terminal 1
-npm run dev:catalog
-
-# Terminal 2
-npm run dev:cart
-
-# Terminal 3
-npm run dev:order
-```
-
-**Opción B: Con PM2 (Producción)**
-
-```bash
-pm2 start catalog-service/src/app.js --name catalog
-pm2 start cart-service/src/app.js --name cart
-pm2 start order-service/src/app.js --name order
+```javascript
+const API_CONFIG = {
+  CATALOG_SERVICE: 'http://TU_IP:3001',  // ⬅️ CAMBIAR
+  CART_SERVICE: 'http://TU_IP:3002',     // ⬅️ CAMBIAR
+  ORDER_SERVICE: 'http://TU_IP:3003'     // ⬅️ CAMBIAR
+};
 ```
 
-## 🧪 Probar el Sistema
+**Ejecutar frontend:**
 
-### 1. Verificar que los servicios estén corriendo
+Simplemente ve a la carpeta frontend/ y da doble click al index.html para abrir de manera local.
 
-```bash
-curl http://localhost:3001/health
-curl http://localhost:3002/health
-curl http://localhost:3003/health
-```
 
-### 2. Listar componentes disponibles
+---
 
-```bash
-curl http://localhost:3001/api/components
-```
+## 📊 Flujo de Compra
 
-### 3. Listar configuraciones disponibles
+1. Usuario ve catálogo de computadoras
+2. Agrega items al carrito (en memoria)
+3. Verifica disponibilidad de stock
+4. Procede al pago
+5. **Order Service descuenta componentes automáticamente**
+6. Se crea la orden con estado "completed"
 
-```bash
-curl http://localhost:3001/api/configs
-```
+---
 
-### 4. Ver una configuración con sus componentes
+## 🔥 Características
 
-```bash
-curl http://localhost:3001/api/configs/LAPTOP-GAMING-01
-```
+✅ Carrito de compras en memoria (localStorage)  
+✅ Descuento automático de stock de componentes  
+✅ Verificación de disponibilidad en tiempo real  
+✅ Arquitectura de microservicios independientes  
+✅ Single Table Design en DynamoDB  
+✅ Transacciones atómicas para evitar overselling  
 
-### 5. Verificar disponibilidad de stock
+---
 
-```bash
-curl -X POST http://localhost:3002/api/cart/check-availability \
-  -H "Content-Type: application/json" \
-  -d '{
-    "configId": "LAPTOP-GAMING-01",
-    "quantity": 2
-  }'
-```
-
-### 6. Crear una orden (descuenta stock automáticamente)
-
-```bash
-curl -X POST http://localhost:3003/api/orders \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": "user-123",
-    "items": [
-      {
-        "configId": "LAPTOP-GAMING-01",
-        "quantity": 1,
-        "price": 1299.00
-      }
-    ]
-  }'
-```
-
-### 7. Verificar que el stock se descontó
-
-```bash
-curl http://localhost:3001/api/components
-```
-
-### 8. Ver todas las órdenes
-
-```bash
-curl http://localhost:3003/api/orders
-```
-
-## 📊 Arquitectura
+## 📝 Estructura del Proyecto
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Catalog Service│     │  Cart Service   │     │  Order Service  │
-│   Port: 3001    │     │   Port: 3002    │     │   Port: 3003    │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                        │
-         └───────────────────────┴────────────────────────┘
-                                 │
-                    ┌────────────▼────────────┐
-                    │   DynamoDB (Shared)     │
-                    │   Table: ecommerce-main │
-                    └─────────────────────────┘
+app-carrito/
+├── catalog-service/       # Microservicio de catálogo
+├── cart-service/          # Microservicio de carrito
+├── order-service/         # Microservicio de órdenes
+├── frontend/              # Frontend local
+│   ├── index.html
+│   └── js/
+│       ├── config.js      # ⚠️ Actualizar IPs aquí
+│       ├── catalog.js
+│       ├── cart.js
+│       ├── cart-view.js
+│       └── orders.js
+├── create-dynamodb-table.js
+├── seed-data.js
+└── package.json
 ```
 
-## 🗂️ Modelo de Datos DynamoDB
+---
 
-### Single Table Design
+## 🚀 Despliegue
 
-| PK | SK | Type | Attributes |
-|----|----|----|------------|
-| COMPONENT#{id} | METADATA | component | name, stock, price, specs |
-| CONFIG#{id} | METADATA | config | name, price, description |
-| CONFIG#{id} | COMPONENT#{id} | composition | quantity |
-| ORDER#{id} | METADATA | order | userId, total, status, date |
-| ORDER#{id} | ITEM#{n} | order_item | configId, quantity, price |
-| ORDER#{id} | RESERVATION#{id} | reservation | components[], status |
+1. Levantar infraestructura con Terraform (repositorio separado)
+2. Obtener IP pública de EC2
+3. Actualizar `frontend/js/config.js` con la IP
+4. Ejecutar frontend localmente
+5. Los microservicios se inician automáticamente con PM2
 
-## 🔧 Microservicios
+---
 
-### Catalog Service (Puerto 3001)
-- Gestión de componentes (RAM, CPU, GPU, etc.)
-- Gestión de configuraciones (laptops pre-armadas)
-- Consulta de stock
+## 👥 Usuario Demo
 
-### Cart Service (Puerto 3002)
-- Agregar items al carrito
-- Verificar disponibilidad de componentes
-- Validar stock antes de comprar
+- **ID:** `user123`
+- **Nombre:** Usuario Demo
 
-### Order Service (Puerto 3003)
-- Crear órdenes
-- **Descontar stock automáticamente de componentes**
-- Crear registros de reserva
-- Consultar historial de órdenes
+---
 
-## ⚡ Flujo de Compra
-
-1. Usuario consulta **catálogo** → Catalog Service
-2. Usuario agrega al **carrito** → Cart Service verifica disponibilidad
-3. Usuario **confirma compra** → Order Service:
-   - Crea la orden
-   - Lee los componentes de cada configuración
-   - Descuenta stock de cada componente (transacción atómica)
-   - Crea registros de reserva
-
-## 💡 Características Destacadas
-
-✅ **Single Table Design** - Una sola tabla DynamoDB para todo
-✅ **Transacciones Atómicas** - Descuento de stock seguro usando `ConditionExpression`
-✅ **Base de Datos Compartida** - Los 3 servicios usan la misma tabla
-✅ **Descuento Automático** - Al crear orden, se descuentan todos los componentes
-✅ **Trazabilidad** - Registros de reserva documentan qué se descontó
-
-## 🌐 Deploy en AWS EC2
-
-Ver guía completa en cada microservicio o consultar `deployment-guide.md`
-
-## 📝 Comandos Útiles
-
-```bash
-# Instalar todo
-npm run setup
-
-# Crear tabla DynamoDB
-npm run create-table
-
-# Cargar datos de prueba
-npm run seed-data
-
-# Iniciar servicios en desarrollo
-npm run dev:catalog
-npm run dev:cart
-npm run dev:order
-
-# Ver logs con PM2
-pm2 logs
-
-# Reiniciar servicios
-pm2 restart all
-```
-
-## 🆘 Troubleshooting
-
-### Error: "Table does not exist"
-```bash
-npm run create-table
-```
-
-### Error: "Cannot connect to DynamoDB"
-Verifica tus credenciales AWS:
-```bash
-aws configure list
-```
-
-### Puerto ocupado
-```bash
-lsof -i :3001
-kill -9 <PID>
-```
-
-## 📚 Documentación
-
-- [Catalog Service README](./catalog-service/README.md)
-- [Cart Service README](./cart-service/README.md)
-- [Order Service README](./order-service/README.md)
-
-## 🔒 Seguridad
-
-- No commitear archivos `.env`
-- Usar IAM Roles en producción
-- Validar todos los inputs
-- Implementar rate limiting en producción
-
-## 📄 Licencia
-
-ISC
