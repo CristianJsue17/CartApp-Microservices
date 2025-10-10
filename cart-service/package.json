@@ -1,0 +1,20 @@
+{
+  "name": "cart-service",
+  "version": "1.0.0",
+  "description": "Servicio de carrito de compras",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "aws-sdk": "^2.1400.0",
+    "dotenv": "^16.0.3",
+    "cors": "^2.8.5",
+    "axios": "^1.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

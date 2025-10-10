@@ -1,0 +1,23 @@
+{
+  "name": "app-carrito",
+  "version": "1.0.0",
+  "description": "Sistema de carrito de compras con microservicios",
+  "main": "index.js",
+  "scripts": {
+    "setup": "npm install && cd catalog-service && npm install && cd ../cart-service && npm install && cd ../order-service && npm install",
+    "create-table": "node create-dynamodb-table.js",
+    "seed-data": "node seed-data.js",
+    "start:catalog": "cd catalog-service && npm start",
+    "start:cart": "cd cart-service && npm start",
+    "start:order": "cd order-service && npm start",
+    "dev:catalog": "cd catalog-service && npm run dev",
+    "dev:cart": "cd cart-service && npm run dev",
+    "dev:order": "cd order-service && npm run dev"
+  },
+  "keywords": ["microservices", "ecommerce", "dynamodb", "nodejs"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1400.0"
+  }
+}
