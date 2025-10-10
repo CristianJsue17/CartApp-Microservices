@@ -12,7 +12,7 @@ AWS.config.update({
 const dynamodb = new AWS.DynamoDB();
 
 const params = {
-  TableName: 'ecommerce-main',
+  TableName: 'ecommerce-main-v2',
   KeySchema: [
     { AttributeName: 'PK', KeyType: 'HASH' },  // Partition key
     { AttributeName: 'SK', KeyType: 'RANGE' }  // Sort key
@@ -25,7 +25,7 @@ const params = {
 };
 
 console.log('🚀 Creando tabla DynamoDB...');
-console.log('📋 Nombre: ecommerce-main');
+console.log('📋 Nombre: ecommerce-main-v2');
 console.log('🗺️  Región: us-east-1');
 console.log('💰 Billing: PAY_PER_REQUEST (Free Tier)');
 console.log('');

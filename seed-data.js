@@ -9,7 +9,7 @@ AWS.config.update({
 });
 
 const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const tableName = 'ecommerce-main';
+const tableName = 'ecommerce-main-v2';
 
 const seedData = async () => {
   try {
