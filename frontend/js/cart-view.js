@@ -113,7 +113,7 @@ async function checkout() {
     // Crear una orden por cada item del carrito
     for (const item of cart) {
       try {
-        await axios.post(`${API_CONFIG.ORDER_SERVICE}/api/orders`, {
+        await axios.post(`${API_CONFIG.GATEWAY}/api/orders`, {
           userId: CURRENT_USER.id,
           configId: item.configId,
           quantity: item.quantity

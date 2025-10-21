@@ -15,7 +15,7 @@ async function checkAvailability(configId) {
     modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
     modal.show();
     
-    const response = await axios.post(`${API_CONFIG.CART_SERVICE}/api/cart/check-availability`, {
+    const response = await axios.post(`${API_CONFIG.GATEWAY}/api/cart/check-availability`, {
       configId: configId,
       quantity: quantity
     });

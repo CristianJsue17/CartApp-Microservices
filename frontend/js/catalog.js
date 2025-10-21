@@ -10,7 +10,7 @@ async function loadConfigs() {
   try {
     showLoading('configsContainer');
     
-    const response = await axios.get(`${API_CONFIG.CATALOG_SERVICE}/api/configs`);
+    const response = await axios.get(`${API_CONFIG.GATEWAY}/api/configs`);
     allConfigs = response.data.configs || [];
     
     container.innerHTML = '';
@@ -48,7 +48,7 @@ async function loadComponents() {
   const container = document.getElementById('componentsContainer');
   
   try {
-    const response = await axios.get(`${API_CONFIG.CATALOG_SERVICE}/api/components`);
+    const response = await axios.get(`${API_CONFIG.GATEWAY}/api/components`);
     allComponents = response.data.components || [];
     
     container.innerHTML = '';
@@ -152,7 +152,7 @@ async function viewConfigDetails(configId) {
     modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
     modal.show();
     
-    const response = await axios.get(`${API_CONFIG.CATALOG_SERVICE}/api/configs/${configId}`);
+    const response = await axios.get(`${API_CONFIG.GATEWAY}/api/configs/${configId}`);
     const { config, components } = response.data;
     
     modalTitle.innerHTML = `<i class="bi bi-laptop"></i> ${config.name}`;

@@ -1,11 +1,8 @@
 // frontend/js/config.js
-// ⚠️ IMPORTANTE: Actualiza estas URLs cada vez que levantes la infraestructura con Terraform
-// Las IPs cambian cada vez que haces terraform apply
+// ⚠️ IMPORTANTE: Actualiza esta URL cuando despliegues con Terraform
 
 const API_CONFIG = {
-  CATALOG_SERVICE: 'http://54.144.73.21:3001',  // ⬅️ CAMBIAR ESTA IP
-  CART_SERVICE: 'http://54.144.73.21:3002',     // ⬅️ CAMBIAR ESTA IP
-  ORDER_SERVICE: 'http://54.144.73.21:3003'     // ⬅️ CAMBIAR ESTA IP
+  GATEWAY: 'http://3.91.20.174:4000'  // 🌐 PUNTO ÚNICO DE ENTRADA
 };
 
 // Usuario actual (simulado - en producción vendría de autenticación)

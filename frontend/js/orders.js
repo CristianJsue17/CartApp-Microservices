@@ -30,7 +30,7 @@ async function createOrder(configId, quantity) {
     orderBtn.disabled = true;
     orderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
     
-    const response = await axios.post(`${API_CONFIG.ORDER_SERVICE}/api/orders`, {
+    const response = await axios.post(`${API_CONFIG.GATEWAY}/api/orders`, {
       userId: CURRENT_USER.id,
       configId: configId,
       quantity: quantity
@@ -192,7 +192,7 @@ async function loadOrders() {
   try {
     showLoading('ordersContainer');
     
-    const response = await axios.get(`${API_CONFIG.ORDER_SERVICE}/api/orders/user/${CURRENT_USER.id}`);
+    const response = await axios.get(`${API_CONFIG.GATEWAY}/api/orders/user/${CURRENT_USER.id}`);
     const orders = response.data.orders || [];
     
     container.innerHTML = '';
