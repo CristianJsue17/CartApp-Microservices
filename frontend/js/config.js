@@ -1,8 +1,8 @@
 // frontend/js/config.js
-// ⚠️ IMPORTANTE: Actualiza esta URL cuando despliegues con Terraform
+// ⚠️ IMPORTANTE: Actualizar esta URL cuando despliegues con Terraform
 
 const API_CONFIG = {
-  GATEWAY: 'http://3.91.20.174:4000'  // 🌐 PUNTO ÚNICO DE ENTRADA
+  GATEWAY: 'http://13.221.75.223:4000'  // 🌐 PUNTO ÚNICO DE ENTRADA
 };
 
 // Usuario actual (simulado - en producción vendría de autenticación)
