@@ -2,6 +2,8 @@
 
 Sistema de e-commerce con arquitectura de microservicios para venta de computadoras con descuento automático de componentes.
 
+## USAR INFRAESTRUCTURA TERRAFORM CON API-GATEWAY-AWS
+
 ## 🚀 Tecnologías
 
 - **Backend:** Node.js + Express.js
