@@ -2,7 +2,7 @@
 // ⚠️ IMPORTANTE: Actualizar esta URL cuando despliegues con Terraform
 
 const API_CONFIG = {
-  GATEWAY: 'http://13.221.75.223:4000'  // 🌐 PUNTO ÚNICO DE ENTRADA
+  GATEWAY: 'https://gvidbjpx35.execute-api.us-east-1.amazonaws.com/prod/api'  // 🌐 PUNTO ÚNICO DE ENTRADA
 };
 
 // Usuario actual (simulado - en producción vendría de autenticación)
