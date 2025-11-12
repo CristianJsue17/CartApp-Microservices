@@ -8,8 +8,25 @@ const configRoutes = require('./routes/configRoutes');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ⭐ CORS Configuration mejorada para API Gateway
+const corsOptions = {
+  origin: '*', // Permite todos los orígenes (puedes restringir después)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Api-Key',
+    'x-api-key',
+    'X-Amz-Date',
+    'X-Amz-Security-Token'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Request-Id'],
+  credentials: true,
+  maxAge: 86400 // 24 horas de cache para preflight
+};
+
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions)); // ⭐ Usar configuración explícita
 app.use(express.json());
 
 // Logging middleware
@@ -70,5 +87,6 @@ app.listen(PORT, () => {
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`📊 DynamoDB Table: ${process.env.DYNAMODB_TABLE}`);
   console.log(`🗺️  Región AWS: ${process.env.AWS_REGION}`);
+  console.log('✅ CORS configurado para API Gateway');
   console.log('=================================');
 });

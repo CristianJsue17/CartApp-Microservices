@@ -1,15 +1,90 @@
-// frontend/js/config.js
-// ⚠️ IMPORTANTE: Actualizar esta URL cuando despliegues con Terraform
+// IMPORTANTE: Actualizar esta URL y API Key cuando despliegues con Terraform
 
 const API_CONFIG = {
-  GATEWAY: 'https://gvidbjpx35.execute-api.us-east-1.amazonaws.com/prod/api'  // 🌐 PUNTO ÚNICO DE ENTRADA
+  GATEWAY: 'https://3uxge2if37.execute-api.us-east-1.amazonaws.com/prod/api',  // PUNTO ÚNICO DE ENTRADA
+  API_KEY: 'COLOCA TU API KEY'  // API KEY 
 };
 
-// Usuario actual (simulado - en producción vendría de autenticación)
+// ⭐ CONFIGURAR AXIOS CUANDO ESTÉ DISPONIBLE
+(function setupAxios() {
+  if (typeof axios !== 'undefined') {
+    axios.defaults.headers.common['x-api-key'] = API_CONFIG.API_KEY;
+    axios.defaults.headers.common['Content-Type'] = 'application/json';
+    
+    // Interceptor para manejar errores
+    axios.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 403) {
+          console.error('❌ API Key inválida');
+          showNotification('No autorizado - Verifica tu API Key', 'danger');
+        } else if (error.response?.status === 429) {
+          console.error('⚠️ Rate limit excedido');
+          showNotification('Demasiadas solicitudes - Intenta más tarde', 'warning');
+        }
+        return Promise.reject(error);
+      }
+    );
+    
+    console.log('✅ Axios configurado con API Key');
+  } else {
+    // Reintentar después de 100ms
+    setTimeout(setupAxios, 100);
+  }
+})();
+
+
+// Usuario actual
 const CURRENT_USER = {
   id: 'user123',
   name: 'Usuario Demo'
 };
+
+// ==========================================
+// FUNCIÓN HELPER PARA PETICIONES SEGURAS
+// ==========================================
+
+async function secureFetch(url, options = {}) {
+  const defaultHeaders = {
+    'x-api-key': API_CONFIG.API_KEY,
+    'Content-Type': 'application/json'
+  };
+
+  const config = {
+    ...options,
+    headers: {
+      ...defaultHeaders,
+      ...options.headers
+    }
+  };
+
+  try {
+    const response = await fetch(url, config);
+    
+    // Manejar errores de autenticación
+    if (response.status === 403) {
+      console.error('❌ API Key inválida o faltante');
+      throw new Error('No autorizado - Verifica tu API Key');
+    }
+    
+    // Manejar rate limiting
+    if (response.status === 429) {
+      console.error('⚠️ Rate limit excedido');
+      throw new Error('Demasiadas solicitudes - Intenta más tarde');
+    }
+    
+    // Manejar otros errores HTTP
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    return response;
+  } catch (error) {
+    console.error('Error en petición:', error);
+    throw error;
+  }
+}
 
 // Helper para mostrar notificaciones
 function showNotification(message, type = 'success') {

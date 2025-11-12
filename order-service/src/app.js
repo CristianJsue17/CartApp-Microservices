@@ -7,8 +7,27 @@ const orderRoutes = require('./routes/orderRoutes');
 const app = express();
 const PORT = process.env.PORT || 3003;
 
+// ANTES: app.use(cors()); ❌ Configuración por defecto (muy básica)
+
+// ⭐ CORS Configuration mejorada para API Gateway
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Api-Key',
+    'x-api-key',
+    'X-Amz-Date',
+    'X-Amz-Security-Token'
+  ],
+  exposedHeaders: ['Content-Length', 'X-Request-Id'],
+  credentials: true,
+  maxAge: 86400
+};
+
 // Middlewares
-app.use(cors());
+app.use(cors(corsOptions)); // ⭐ Usar configuración explícita
 app.use(express.json());
 
 // Logging middleware
@@ -70,5 +89,6 @@ app.listen(PORT, () => {
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`📊 DynamoDB Table: ${process.env.DYNAMODB_TABLE}`);
   console.log(`🗺️  Región AWS: ${process.env.AWS_REGION}`);
+  console.log('✅ CORS configurado para API Gateway');
   console.log('=================================');
 });
