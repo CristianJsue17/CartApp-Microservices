@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 /**
  * Crear orden y descontar stock de componentes automáticamente
  * POST /api/orders
- * Body: { userId, configId, quantity }
+ * Body: { configId, quantity }
  * 
  * Este endpoint:
  * 1. Crea la orden de UNA computadora
@@ -13,12 +13,17 @@ const { v4: uuidv4 } = require('uuid');
  */
 exports.createOrder = async (req, res) => {
   try {
-    const { userId, configId, quantity } = req.body;
+    const { configId, quantity } = req.body;
+    
+    // ⭐ CAMBIO: userId viene del JWT (req.user), NO del body
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+    const userName = req.user.name;
     
     // Validar datos requeridos
-    if (!userId || !configId || !quantity) {
+    if (!configId || !quantity) {
       return res.status(400).json({ 
-        error: 'Faltan campos requeridos: userId, configId, quantity' 
+        error: 'Faltan campos requeridos: configId, quantity' 
       });
     }
 
@@ -54,7 +59,7 @@ exports.createOrder = async (req, res) => {
     const orderId = uuidv4();
 
     console.log(`\n🛒 Iniciando orden ${orderId}`);
-    console.log(`📱 Usuario: ${userId}`);
+    console.log(`👤 Usuario: ${userName} (${userEmail})`);
     console.log(`💻 Computadora: ${configName}`);
     console.log(`📊 Cantidad: ${quantity}`);
     console.log(`💰 Total: $${total.toFixed(2)}\n`);
@@ -68,6 +73,8 @@ exports.createOrder = async (req, res) => {
         Type: 'order',
         orderId,
         userId,
+        userEmail,      // ⭐ NUEVO: Info del usuario
+        userName,       // ⭐ NUEVO: Info del usuario
         configId,
         configName,
         quantity,
@@ -107,7 +114,7 @@ exports.createOrder = async (req, res) => {
     // 3. Descontar stock de cada componente
     for (const comp of components) {
       const componentId = comp.SK.replace('COMPONENT#', '');
-      const requiredQty = comp.quantity * quantity; // cantidad por config * cantidad de configs compradas
+      const requiredQty = comp.quantity * quantity;
 
       console.log(`📦 Procesando: ${componentId}`);
       console.log(`   Cantidad requerida: ${requiredQty} unidades`);
@@ -120,7 +127,7 @@ exports.createOrder = async (req, res) => {
           SK: 'METADATA'
         },
         UpdateExpression: 'SET stock = stock - :qty, updatedAt = :updatedAt',
-        ConditionExpression: 'stock >= :qty', // Solo descuenta si hay suficiente stock
+        ConditionExpression: 'stock >= :qty',
         ExpressionAttributeValues: {
           ':qty': requiredQty,
           ':updatedAt': new Date().toISOString()
@@ -145,11 +152,9 @@ exports.createOrder = async (req, res) => {
         console.log(`   📊 Stock actual: ${updateResult.Attributes.stock}\n`);
 
       } catch (error) {
-        // Si falla el descuento (stock insuficiente)
         if (error.code === 'ConditionalCheckFailedException') {
           console.error(`   ❌ Stock insuficiente para ${componentId}\n`);
           
-          // Obtener stock actual para mostrar en el error
           const stockCheckParams = {
             TableName: tableName,
             Key: {
@@ -169,7 +174,7 @@ exports.createOrder = async (req, res) => {
             message: `No hay suficiente stock de "${stockCheck.Item ? stockCheck.Item.name : componentId}". Necesitas ${requiredQty} unidades pero solo hay ${currentStock} disponibles.`
           });
         }
-        throw error; // Re-lanzar otros errores
+        throw error;
       }
     }
 
@@ -187,7 +192,7 @@ exports.createOrder = async (req, res) => {
     };
     await dynamoDB.put(componentsRecordParams).promise();
 
-    console.log(`🎉 Orden ${orderId} completada exitosamente`);
+    console.log(`🎉 Orden ${orderId} completada exitosamente por ${userEmail}`);
     console.log(`═══════════════════════════════════════════════\n`);
 
     res.status(201).json({ 
@@ -196,6 +201,8 @@ exports.createOrder = async (req, res) => {
       order: {
         orderId,
         userId,
+        userEmail,
+        userName,
         configId,
         configName,
         quantity,
@@ -217,14 +224,15 @@ exports.createOrder = async (req, res) => {
 };
 
 /**
- * Obtener orden por ID con todos sus detalles
+ * Obtener orden por ID con validación de ownership
  * GET /api/orders/:orderId
  */
 exports.getOrderById = async (req, res) => {
   try {
     const { orderId } = req.params;
+    const user = req.user; // ⭐ Usuario del JWT
 
-    // Scan para buscar la orden (ya que ahora PK es USER#userId)
+    // Scan para buscar la orden
     const params = {
       TableName: tableName,
       FilterExpression: 'orderId = :orderId AND #type = :orderType',
@@ -247,6 +255,16 @@ exports.getOrderById = async (req, res) => {
     }
 
     const order = result.Items[0];
+
+    // ⭐ VALIDACIÓN: Usuario solo puede ver SUS órdenes (a menos que sea admin)
+    if (user.role !== 'admin' && order.userId !== user.userId) {
+      console.log(`⚠️ Acceso denegado: ${user.email} intentó ver orden de otro usuario`);
+      return res.status(403).json({
+        success: false,
+        error: 'Acceso denegado',
+        message: 'No tienes permiso para ver esta orden'
+      });
+    }
 
     // Buscar componentes usados
     const componentsParams = {
@@ -281,11 +299,16 @@ exports.getOrderById = async (req, res) => {
 };
 
 /**
- * Obtener todas las órdenes
+ * Obtener todas las órdenes (SOLO ADMIN)
  * GET /api/orders
  */
 exports.getAllOrders = async (req, res) => {
   try {
+    // ⭐ Ya validado por middleware requireAdmin en las rutas
+    const user = req.user;
+    
+    console.log(`📋 Admin ${user.email} consultando todas las órdenes`);
+
     const params = {
       TableName: tableName,
       FilterExpression: '#type = :orderType',
@@ -303,7 +326,7 @@ exports.getAllOrders = async (req, res) => {
       success: true,
       count: result.Items.length,
       orders: result.Items.sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt) // Ordenar por fecha descendente
+        new Date(b.createdAt) - new Date(a.createdAt)
       )
     });
 
@@ -318,12 +341,23 @@ exports.getAllOrders = async (req, res) => {
 };
 
 /**
- * Obtener órdenes por usuario
+ * Obtener órdenes por usuario con validación de ownership
  * GET /api/orders/user/:userId
  */
 exports.getOrdersByUser = async (req, res) => {
   try {
     const { userId } = req.params;
+    const user = req.user; // ⭐ Usuario del JWT
+
+    // ⭐ VALIDACIÓN: Usuario solo puede ver SUS propias órdenes (a menos que sea admin)
+    if (user.role !== 'admin' && user.userId !== userId) {
+      console.log(`⚠️ Acceso denegado: ${user.email} intentó ver órdenes de otro usuario`);
+      return res.status(403).json({
+        success: false,
+        error: 'Acceso denegado',
+        message: 'No tienes permiso para ver órdenes de otros usuarios'
+      });
+    }
 
     const params = {
       TableName: tableName,

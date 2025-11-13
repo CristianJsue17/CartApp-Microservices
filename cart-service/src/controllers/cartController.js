@@ -10,12 +10,16 @@ const axios = require('axios');
  */
 exports.addToCart = async (req, res) => {
   try {
-    const { userId, configId, quantity } = req.body;
+    const { configId, quantity } = req.body;
+    
+    // ⭐ CAMBIO: userId viene del JWT (req.user), NO del body
+    const userId = req.user.userId;  // Viene del middleware authenticateToken
+    const userEmail = req.user.email;
 
     // Validar datos requeridos
-    if (!userId || !configId || !quantity) {
+    if (!configId || !quantity) {
       return res.status(400).json({ 
-        error: 'Faltan campos requeridos: userId, configId, quantity' 
+        error: 'Faltan campos requeridos: configId, quantity' 
       });
     }
 
@@ -39,11 +43,15 @@ exports.addToCart = async (req, res) => {
 
       const configData = configResponse.data;
 
+      // ⭐ Log mejorado con información del usuario
+      console.log(`✅ Usuario ${userEmail} agregó ${quantity}x ${configData.config.name} al carrito`);
+
       res.json({ 
         success: true,
         message: 'Item agregado al carrito exitosamente', 
         cart: { 
-          userId, 
+          userId,           // ⭐ userId del JWT
+          userEmail,        // ⭐ Información adicional
           configId, 
           quantity, 
           config: configData.config,
@@ -165,6 +173,9 @@ exports.checkAvailability = async (req, res) => {
     // Verificar si todos los componentes tienen stock suficiente
     const allAvailable = availability.every(item => item.sufficient);
     const insufficientItems = availability.filter(item => !item.sufficient);
+
+    // ⭐ Log mejorado
+    console.log(`✅ Usuario ${req.user.email} verificó disponibilidad: ${configId} x${quantity} - ${allAvailable ? 'Disponible' : 'No disponible'}`);
 
     res.json({ 
       success: true,

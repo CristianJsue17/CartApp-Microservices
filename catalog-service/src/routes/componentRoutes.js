@@ -1,17 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const componentController = require('../controllers/componentController');
+const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
 
-// Crear componente
-router.post('/', componentController.createComponent);
-
+// Rutas PÚBLICAS (sin autenticación)
 // Obtener todos los componentes
 router.get('/', componentController.getAllComponents);
 
 // Obtener componente por ID
 router.get('/:id', componentController.getComponentById);
 
-// Actualizar stock de componente
-router.patch('/:id/stock', componentController.updateComponentStock);
+
+// Rutas PROTEGIDAS (requieren autenticación + rol admin)
+// Crear componente - SOLO ADMIN
+router.post('/', authenticateToken, requireAdmin, componentController.createComponent);
+
+// Actualizar stock de componente - SOLO ADMIN
+router.patch('/:id/stock', authenticateToken, requireAdmin, componentController.updateComponentStock);
 
 module.exports = router;

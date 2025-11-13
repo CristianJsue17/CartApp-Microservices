@@ -1,8 +1,8 @@
 // IMPORTANTE: Actualizar esta URL y API Key cuando despliegues con Terraform
 
 const API_CONFIG = {
-  GATEWAY: 'https://3uxge2if37.execute-api.us-east-1.amazonaws.com/prod/api',  // PUNTO ÚNICO DE ENTRADA
-  API_KEY: 'COLOCA TU API KEY'  // API KEY 
+  GATEWAY: 'https://cv0mdok1v4.execute-api.us-east-1.amazonaws.com/prod/api',  // PUNTO ÚNICO DE ENTRADA
+  API_KEY: '56W5CZ9kyHaHojXKYPWMw6FtiRMEEdn83FU5dXvA'  // API KEY 
 };
 
 // ⭐ CONFIGURAR AXIOS CUANDO ESTÉ DISPONIBLE
