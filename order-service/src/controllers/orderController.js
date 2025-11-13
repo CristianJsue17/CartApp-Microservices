@@ -303,13 +303,11 @@ exports.getOrderById = async (req, res) => {
  * GET /api/orders
  */
 // ⭐ MODIFICADO: Permitir a usuarios ver sus propias órdenes
-const getAllOrders = async (req, res) => {
+exports.getAllOrders = async (req, res) => {
   try {
-    const userIdFromToken = req.user.userId; // Del JWT
-    const userRole = req.user.role; // Del JWT
+    const userIdFromToken = req.user.userId;
+    const userRole = req.user.role;
     
-    // Si es admin, puede ver todas las órdenes
-    // Si es user, solo ve sus propias órdenes
     const pkValue = userRole === 'admin' ? null : `USER#${userIdFromToken}`;
     
     let params;
