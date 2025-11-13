@@ -299,43 +299,78 @@ exports.getOrderById = async (req, res) => {
 };
 
 /**
- * Obtener todas las órdenes (SOLO ADMIN)
+ * Obtener todas las órdenes del usuario autenticado,  o todas las órdenes (admin)
  * GET /api/orders
  */
-exports.getAllOrders = async (req, res) => {
+// ⭐ MODIFICADO: Permitir a usuarios ver sus propias órdenes
+const getAllOrders = async (req, res) => {
   try {
-    // ⭐ Ya validado por middleware requireAdmin en las rutas
-    const user = req.user;
+    const userIdFromToken = req.user.userId; // Del JWT
+    const userRole = req.user.role; // Del JWT
     
-    console.log(`📋 Admin ${user.email} consultando todas las órdenes`);
-
-    const params = {
-      TableName: tableName,
-      FilterExpression: '#type = :orderType',
-      ExpressionAttributeNames: {
-        '#type': 'Type'
-      },
-      ExpressionAttributeValues: {
-        ':orderType': 'order'
-      }
-    };
-
-    const result = await dynamoDB.scan(params).promise();
+    // Si es admin, puede ver todas las órdenes
+    // Si es user, solo ve sus propias órdenes
+    const pkValue = userRole === 'admin' ? null : `USER#${userIdFromToken}`;
     
-    res.json({ 
+    let params;
+    
+    if (pkValue) {
+      // Usuario normal: solo sus órdenes
+      params = {
+        TableName: tableName,
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+        ExpressionAttributeValues: {
+          ':pk': pkValue,
+          ':sk': 'ORDER#'
+        }
+      };
+    } else {
+      // Admin: todas las órdenes (scan)
+      params = {
+        TableName: tableName,
+        FilterExpression: 'begins_with(SK, :sk)',
+        ExpressionAttributeValues: {
+          ':sk': 'ORDER#'
+        }
+      };
+    }
+
+    let result;
+    if (pkValue) {
+      result = await dynamoDB.query(params).promise();
+    } else {
+      result = await dynamoDB.scan(params).promise();
+    }
+
+    const orders = result.Items.map(item => ({
+      orderId: item.orderId,
+      userId: item.PK.replace('USER#', ''),
+      configId: item.configId,
+      configName: item.configName,
+      quantity: item.quantity,
+      totalPrice: item.totalPrice,
+      status: item.status,
+      createdAt: item.createdAt,
+      PK: item.PK,
+      SK: item.SK
+    }));
+
+    res.json({
       success: true,
-      count: result.Items.length,
-      orders: result.Items.sort((a, b) => 
-        new Date(b.createdAt) - new Date(a.createdAt)
-      )
+      count: orders.length,
+      orders: orders,
+      userRole: userRole,
+      message: userRole === 'admin' 
+        ? 'Mostrando todas las órdenes (admin)' 
+        : 'Mostrando tus órdenes'
     });
 
   } catch (error) {
     console.error('Error al obtener órdenes:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Error al obtener órdenes',
-      message: error.message 
+      message: error.message
     });
   }
 };

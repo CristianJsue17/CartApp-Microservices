@@ -86,10 +86,20 @@ function loadCart() {
   totalElement.textContent = formatPrice(getCartTotal());
 }
 
-// Proceder al checkout (crear todas las órdenes)
+// Proceder al checkout (crear todas las órdenes con JWT)
 async function checkout() {
   if (cart.length === 0) {
     showNotification('El carrito está vacío', 'warning');
+    return;
+  }
+  
+  // Verificar autenticación
+  if (!AUTH.isAuthenticated()) {
+    showNotification('Debes iniciar sesión para completar la compra', 'warning');
+    const cartModalElement = document.getElementById('cartModal');
+    const cartModal = bootstrap.Modal.getInstance(cartModalElement);
+    if (cartModal) cartModal.hide();
+    showLoginModal();
     return;
   }
   
@@ -111,10 +121,10 @@ async function checkout() {
     let failedItems = [];
     
     // Crear una orden por cada item del carrito
+    // ⭐ NOTA: Ya NO se envía userId, se obtiene del JWT automáticamente
     for (const item of cart) {
       try {
         await axios.post(`${API_CONFIG.GATEWAY}/orders`, {
-          userId: CURRENT_USER.id,
           configId: item.configId,
           quantity: item.quantity
         });
@@ -166,7 +176,12 @@ async function checkout() {
     }
     
   } catch (error) {
-    handleError(error, 'checkout');
+    if (error.response?.status === 401) {
+      showNotification('Sesión expirada. Inicia sesión nuevamente.', 'warning');
+      showLoginModal();
+    } else {
+      handleError(error, 'checkout');
+    }
   } finally {
     checkoutBtn.disabled = false;
     checkoutBtn.innerHTML = originalText;

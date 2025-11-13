@@ -1,6 +1,6 @@
 // frontend/js/cart.js
 
-// Verificar disponibilidad de stock para una configuración
+// Verificar disponibilidad de stock para una configuración (CON JWT AUTOMÁTICO)
 async function checkAvailability(configId) {
   const quantity = parseInt(document.getElementById('orderQuantity').value);
   const modal = new bootstrap.Modal(document.getElementById('availabilityModal'));
@@ -11,10 +11,18 @@ async function checkAvailability(configId) {
     return;
   }
   
+  // Verificar autenticación
+  if (!AUTH.isAuthenticated()) {
+    showNotification('Debes iniciar sesión para verificar disponibilidad', 'warning');
+    showLoginModal();
+    return;
+  }
+  
   try {
     modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
     modal.show();
     
+    // ⭐ JWT se envía automáticamente vía interceptor de Axios
     const response = await axios.post(`${API_CONFIG.GATEWAY}/cart/check-availability`, {
       configId: configId,
       quantity: quantity
@@ -102,7 +110,13 @@ async function checkAvailability(configId) {
     modalBody.innerHTML = html; 
     
   } catch (error) {
-    handleError(error, 'checkAvailability');
-    modal.hide();
+    if (error.response?.status === 401) {
+      showNotification('Sesión expirada. Inicia sesión nuevamente.', 'warning');
+      modal.hide();
+      showLoginModal();
+    } else {
+      handleError(error, 'checkAvailability');
+      modal.hide();
+    }
   }
 }

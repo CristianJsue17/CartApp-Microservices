@@ -9,6 +9,13 @@ async function createOrderFromModal(configId, configName) {
     return;
   }
   
+  // Verificar si está autenticado
+  if (!AUTH.isAuthenticated()) {
+    showNotification('Debes iniciar sesión para crear una orden', 'warning');
+    showLoginModal();
+    return;
+  }
+  
   const confirmed = confirm(
     `¿Confirmar compra?\n\n` +
     `Computadora: ${configName}\n` +
@@ -21,17 +28,24 @@ async function createOrderFromModal(configId, configName) {
   await createOrder(configId, quantity);
 }
 
-// Crear una nueva orden
+// Crear una nueva orden (CON JWT AUTOMÁTICO VÍA AXIOS)
 async function createOrder(configId, quantity) {
   try {
+    // Verificar autenticación
+    if (!AUTH.isAuthenticated()) {
+      showNotification('Debes iniciar sesión para crear una orden', 'warning');
+      showLoginModal();
+      return;
+    }
+    
     // Mostrar indicador de carga
     const orderBtn = document.getElementById('createOrderBtn');
     const originalText = orderBtn.innerHTML;
     orderBtn.disabled = true;
     orderBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
     
+    // ⭐ NOTA: userId ya NO se envía en el body, se obtiene del JWT en el backend
     const response = await axios.post(`${API_CONFIG.GATEWAY}/orders`, {
-      userId: CURRENT_USER.id,
       configId: configId,
       quantity: quantity
     });
@@ -68,14 +82,18 @@ async function createOrder(configId, quantity) {
       orderBtn.innerHTML = '<i class="bi bi-cart-check"></i> Crear Orden';
     }
     
+    // Manejar error de autenticación
+    if (error.response?.status === 401) {
+      showNotification('Sesión expirada. Inicia sesión nuevamente.', 'warning');
+      showLoginModal();
+      return;
+    }
+    
     // Manejar errores específicos de stock insuficiente
-    if (error.response && error.response.data) {
+    if (error.response?.data) {
       const errorData = error.response.data;
       if (errorData.error === 'Stock insuficiente') {
-        showNotification(
-          `❌ ${errorData.message}`,
-          'danger'
-        );
+        showNotification(`❌ ${errorData.message}`, 'danger');
       } else {
         handleError(error, 'createOrder');
       }
@@ -185,14 +203,30 @@ function showOrderSuccessModal(order) {
   modal.show();
 }
 
-// Cargar todas las órdenes del usuario
+// Cargar todas las órdenes del usuario (CON JWT AUTOMÁTICO VÍA AXIOS)
 async function loadOrders() {
   const container = document.getElementById('ordersContainer');
+  
+  // Verificar autenticación
+  if (!AUTH.isAuthenticated()) {
+    container.innerHTML = `
+      <div class="col-12">
+        <div class="alert alert-warning">
+          <i class="bi bi-exclamation-triangle"></i> Debes iniciar sesión para ver tus órdenes.
+          <button class="btn btn-sm btn-primary ms-3" onclick="showLoginModal()">
+            <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+          </button>
+        </div>
+      </div>
+    `;
+    return;
+  }
   
   try {
     showLoading('ordersContainer');
     
-    const response = await axios.get(`${API_CONFIG.GATEWAY}/orders?userId=${CURRENT_USER.id}`);
+    // ⭐ ACTUALIZADO: Ya NO se envía userId, el backend lo obtiene del JWT
+    const response = await axios.get(`${API_CONFIG.GATEWAY}/orders`);
     const orders = response.data.orders || [];
     
     container.innerHTML = '';
@@ -209,20 +243,44 @@ async function loadOrders() {
       return;
     }
     
+    // ⭐ Mostrar mensaje si es admin
+    if (response.data.userRole === 'admin') {
+      container.innerHTML = `
+        <div class="col-12 mb-3">
+          <div class="alert alert-info">
+            <i class="bi bi-shield-check"></i> <strong>Vista de Administrador:</strong> 
+            Mostrando todas las órdenes de todos los usuarios (${orders.length} órdenes)
+          </div>
+        </div>
+      `;
+    }
+    
     orders.forEach(order => {
       container.innerHTML += createOrderCard(order);
     });
     
   } catch (error) {
-    handleError(error, 'loadOrders');
-    container.innerHTML = `
-      <div class="col-12">
-        <div class="alert alert-danger">
-          <i class="bi bi-exclamation-triangle"></i> Error al cargar órdenes.
-          Verifica que el Order Service esté activo en <code>${API_CONFIG.ORDER_SERVICE}</code>
+    if (error.response?.status === 401) {
+      container.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> Sesión expirada. Por favor, inicia sesión.
+            <button class="btn btn-sm btn-primary ms-3" onclick="showLoginModal()">
+              <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+            </button>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      handleError(error, 'loadOrders');
+      container.innerHTML = `
+        <div class="col-12">
+          <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> Error al cargar órdenes.
+          </div>
+        </div>
+      `;
+    }
   }
 }
 

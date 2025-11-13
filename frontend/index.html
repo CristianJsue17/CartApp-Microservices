@@ -114,6 +114,36 @@
     .fade-in {
       animation: fadeIn 0.5s ease-in;
     }
+
+    /* Estilos para el dropdown de usuario */
+    .user-dropdown {
+      cursor: pointer;
+    }
+
+    .dropdown-menu {
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    }
+
+    /* Badge de invitado */
+    .guest-badge {
+      background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* Badge de usuario autenticado */
+    .auth-badge {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -147,10 +177,39 @@
               </span>
             </a>
           </li>
-          <li class="nav-item">
-            <span class="nav-link">
-              <i class="bi bi-person-circle"></i> <span id="userName">Usuario Demo</span>
-            </span>
+          
+          <!-- User Dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle user-dropdown" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-person-circle fs-5"></i> 
+              <span id="userName">Invitado</span>
+              <span id="userBadge" class="guest-badge">Invitado</span>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+              <!-- Guest Menu -->
+              <li id="guestMenu">
+                <a class="dropdown-item" href="#" onclick="showLoginModal(); return false;">
+                  <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+                </a>
+              </li>
+              <li id="guestMenuRegister">
+                <a class="dropdown-item" href="#" onclick="showRegisterModal(); return false;">
+                  <i class="bi bi-person-plus"></i> Registrarse
+                </a>
+              </li>
+              <!-- Authenticated Menu -->
+              <li id="authMenuProfile" style="display: none;">
+                <h6 class="dropdown-header">
+                  <i class="bi bi-person-circle"></i> <span id="userEmailDisplay"></span>
+                </h6>
+              </li>
+              <li id="authMenuDivider" style="display: none;"><hr class="dropdown-divider"></li>
+              <li id="authMenuLogout" style="display: none;">
+                <a class="dropdown-item text-danger" href="#" onclick="logout(); return false;">
+                  <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                </a>
+              </li>
+            </ul>
           </li>
         </ul>
       </div>
@@ -218,6 +277,97 @@
       </div>
     </section>
 
+  </div>
+
+  <!-- Login Modal -->
+  <div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="mb-3">
+              <label for="loginEmail" class="form-label">
+                <i class="bi bi-envelope"></i> Correo Electrónico
+              </label>
+              <input type="email" class="form-control" id="loginEmail" required placeholder="tu@email.com">
+            </div>
+            <div class="mb-3">
+              <label for="loginPassword" class="form-label">
+                <i class="bi bi-lock"></i> Contraseña
+              </label>
+              <input type="password" class="form-control" id="loginPassword" required placeholder="••••••••">
+            </div>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary" id="loginBtn">
+                <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+              </button>
+            </div>
+          </form>
+          <hr>
+          <div class="text-center">
+            <small class="text-muted">¿No tienes cuenta?</small>
+            <a href="#" onclick="switchToRegister(); return false;" class="text-decoration-none">
+              <strong>Regístrate aquí</strong>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div class="modal fade" id="registerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-person-plus"></i> Crear Cuenta
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="registerForm" onsubmit="handleRegister(event)">
+            <div class="mb-3">
+              <label for="registerName" class="form-label">
+                <i class="bi bi-person"></i> Nombre Completo
+              </label>
+              <input type="text" class="form-control" id="registerName" required placeholder="Juan Pérez">
+            </div>
+            <div class="mb-3">
+              <label for="registerEmail" class="form-label">
+                <i class="bi bi-envelope"></i> Correo Electrónico
+              </label>
+              <input type="email" class="form-control" id="registerEmail" required placeholder="tu@email.com">
+            </div>
+            <div class="mb-3">
+              <label for="registerPassword" class="form-label">
+                <i class="bi bi-lock"></i> Contraseña
+              </label>
+              <input type="password" class="form-control" id="registerPassword" required placeholder="Mínimo 6 caracteres" minlength="6">
+              <small class="form-text text-muted">Mínimo 6 caracteres</small>
+            </div>
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary" id="registerBtn">
+                <i class="bi bi-person-plus"></i> Registrarse
+              </button>
+            </div>
+          </form>
+          <hr>
+          <div class="text-center">
+            <small class="text-muted">¿Ya tienes cuenta?</small>
+            <a href="#" onclick="switchToLogin(); return false;" class="text-decoration-none">
+              <strong>Inicia sesión aquí</strong>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Config Detail Modal -->
@@ -293,59 +443,7 @@
     </div>
   </div>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- Axios for HTTP requests -->
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
-  
-  <!-- App Scripts -->
-  <script src="js/config.js"></script>
-  <script src="js/catalog.js"></script>
-  <script src="js/cart.js"></script>
-  <script src="js/orders.js"></script>
-  <script src="js/cart-view.js"></script>
-  
-  <script>
-    // Initialize app
-    document.addEventListener('DOMContentLoaded', function() {
-      // Cargar carrito desde localStorage
-      loadCartFromLocalStorage();
-      
-      // Set user name
-      document.getElementById('userName').textContent = CURRENT_USER.name;
-      
-      // Load catalog
-      loadConfigs();
-      loadComponents();
-      
-      // Setup navigation
-      document.querySelectorAll('[data-section]').forEach(link => {
-        link.addEventListener('click', function(e) {
-          e.preventDefault();
-          const section = this.dataset.section;
-          
-          // Update active nav
-          document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-          this.classList.add('active');
-          
-          // Show/hide sections
-          if (section === 'catalog') {
-            document.getElementById('catalogSection').style.display = 'block';
-            document.getElementById('ordersSection').style.display = 'none';
-            loadConfigs();
-            loadComponents();
-          } else if (section === 'orders') {
-            document.getElementById('catalogSection').style.display = 'none';
-            document.getElementById('ordersSection').style.display = 'block';
-            loadOrders();
-          }
-        });
-      });
-    });
-  </script>
-
-    <!-- Cart Modal -->
+  <!-- Cart Modal -->
   <div class="modal fade" id="cartModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
@@ -377,5 +475,58 @@
       </div>
     </div>
   </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- Axios for HTTP requests -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.2/dist/axios.min.js"></script>
+  
+  <!-- App Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/catalog.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/orders.js"></script>
+  <script src="js/cart-view.js"></script>
+  
+  <script>
+    // Initialize app
+    document.addEventListener('DOMContentLoaded', function() {
+      // Cargar carrito desde localStorage
+      loadCartFromLocalStorage();
+      
+      // Actualizar UI según estado de autenticación
+      updateAuthUI();
+      
+      // Load catalog
+      loadConfigs();
+      loadComponents();
+      
+      // Setup navigation
+      document.querySelectorAll('[data-section]').forEach(link => {
+        link.addEventListener('click', function(e) {
+          e.preventDefault();
+          const section = this.dataset.section;
+          
+          // Update active nav
+          document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+          this.classList.add('active');
+          
+          // Show/hide sections
+          if (section === 'catalog') {
+            document.getElementById('catalogSection').style.display = 'block';
+            document.getElementById('ordersSection').style.display = 'none';
+            loadConfigs();
+            loadComponents();
+          } else if (section === 'orders') {
+            document.getElementById('catalogSection').style.display = 'none';
+            document.getElementById('ordersSection').style.display = 'block';
+            loadOrders();
+          }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

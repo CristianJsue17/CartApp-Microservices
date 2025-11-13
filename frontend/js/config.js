@@ -1,23 +1,84 @@
-// IMPORTANTE: Actualizar esta URL y API Key cuando despliegues con Terraform
+// ==========================================
+// CONFIGURACIÓN DEL API GATEWAY + JWT
+// ==========================================
 
 const API_CONFIG = {
-  GATEWAY: 'https://cv0mdok1v4.execute-api.us-east-1.amazonaws.com/prod/api',  // PUNTO ÚNICO DE ENTRADA
-  API_KEY: '56W5CZ9kyHaHojXKYPWMw6FtiRMEEdn83FU5dXvA'  // API KEY 
+  GATEWAY: 'https://7etakbbf4i.execute-api.us-east-1.amazonaws.com/prod/api',
+  API_KEY: 'XuDdKuwDkQ3IkOmpNYqea5kVqwTsSIpW6kWKga0I' // Tu API Key completa
 };
 
-// ⭐ CONFIGURAR AXIOS CUANDO ESTÉ DISPONIBLE
+// ==========================================
+// GESTIÓN DE AUTENTICACIÓN JWT
+// ==========================================
+
+const AUTH = {
+  // Obtener token del localStorage
+  getToken() {
+    return localStorage.getItem('jwt_token');
+  },
+  
+  // Guardar token
+  setToken(token) {
+    localStorage.setItem('jwt_token', token);
+  },
+  
+  // Obtener usuario del localStorage
+  getUser() {
+    const userStr = localStorage.getItem('user_data');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+  
+  // Guardar usuario
+  setUser(user) {
+    localStorage.setItem('user_data', JSON.stringify(user));
+  },
+  
+  // Verificar si está autenticado
+  isAuthenticated() {
+    return !!this.getToken();
+  },
+  
+  // Cerrar sesión
+  logout() {
+    localStorage.removeItem('jwt_token');
+    localStorage.removeItem('user_data');
+    location.reload();
+  }
+};
+
+// ==========================================
+// CONFIGURAR AXIOS CON API KEY + JWT
+// ==========================================
+
 (function setupAxios() {
   if (typeof axios !== 'undefined') {
+    // Headers por defecto
     axios.defaults.headers.common['x-api-key'] = API_CONFIG.API_KEY;
     axios.defaults.headers.common['Content-Type'] = 'application/json';
+    
+    // Interceptor para agregar JWT token automáticamente
+    axios.interceptors.request.use(
+      config => {
+        const token = AUTH.getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      error => Promise.reject(error)
+    );
     
     // Interceptor para manejar errores
     axios.interceptors.response.use(
       response => response,
       error => {
-        if (error.response?.status === 403) {
-          console.error('❌ API Key inválida');
-          showNotification('No autorizado - Verifica tu API Key', 'danger');
+        if (error.response?.status === 401) {
+          console.error('❌ No autenticado o token expirado');
+          showNotification('Sesión expirada. Por favor, inicia sesión nuevamente.', 'warning');
+          AUTH.logout();
+        } else if (error.response?.status === 403) {
+          console.error('❌ No autorizado');
+          showNotification('No tienes permisos para esta acción', 'danger');
         } else if (error.response?.status === 429) {
           console.error('⚠️ Rate limit excedido');
           showNotification('Demasiadas solicitudes - Intenta más tarde', 'warning');
@@ -26,19 +87,77 @@ const API_CONFIG = {
       }
     );
     
-    console.log('✅ Axios configurado con API Key');
+    console.log('✅ Axios configurado con API Key + JWT interceptors');
   } else {
-    // Reintentar después de 100ms
     setTimeout(setupAxios, 100);
   }
 })();
 
+// ==========================================
+// USUARIO ACTUAL (CON JWT)
+// ==========================================
 
-// Usuario actual
-const CURRENT_USER = {
-  id: 'user123',
-  name: 'Usuario Demo'
+let CURRENT_USER = AUTH.getUser() || {
+  id: 'guest',
+  name: 'Invitado',
+  email: 'guest@example.com',
+  role: 'guest'
 };
+
+// ==========================================
+// FUNCIONES DE AUTENTICACIÓN
+// ==========================================
+
+async function login(email, password) {
+  try {
+    const response = await axios.post(`${API_CONFIG.GATEWAY}/auth/login`, {
+      email,
+      password
+    });
+    
+    const { token, user } = response.data;
+    
+    // Guardar token y usuario
+    AUTH.setToken(token);
+    AUTH.setUser(user);
+    CURRENT_USER = user;
+    
+    showNotification(`Bienvenido ${user.name}!`, 'success');
+    return true;
+  } catch (error) {
+    handleError(error, 'Login');
+    return false;
+  }
+}
+
+async function register(email, password, name) {
+  try {
+    const response = await axios.post(`${API_CONFIG.GATEWAY}/auth/register`, {
+      email,
+      password,
+      name
+    });
+    
+    const { token, user } = response.data;
+    
+    // Guardar token y usuario
+    AUTH.setToken(token);
+    AUTH.setUser(user);
+    CURRENT_USER = user;
+    
+    showNotification(`Registro exitoso! Bienvenido ${user.name}!`, 'success');
+    return true;
+  } catch (error) {
+    handleError(error, 'Registro');
+    return false;
+  }
+}
+
+function logout() {
+  if (confirm('¿Cerrar sesión?')) {
+    AUTH.logout();
+  }
+}
 
 // ==========================================
 // FUNCIÓN HELPER PARA PETICIONES SEGURAS
@@ -49,6 +168,12 @@ async function secureFetch(url, options = {}) {
     'x-api-key': API_CONFIG.API_KEY,
     'Content-Type': 'application/json'
   };
+  
+  // Agregar JWT si existe
+  const token = AUTH.getToken();
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
+  }
 
   const config = {
     ...options,
@@ -61,19 +186,20 @@ async function secureFetch(url, options = {}) {
   try {
     const response = await fetch(url, config);
     
-    // Manejar errores de autenticación
-    if (response.status === 403) {
-      console.error('❌ API Key inválida o faltante');
-      throw new Error('No autorizado - Verifica tu API Key');
+    if (response.status === 401) {
+      showNotification('Sesión expirada. Por favor, inicia sesión.', 'warning');
+      AUTH.logout();
+      throw new Error('No autenticado');
     }
     
-    // Manejar rate limiting
+    if (response.status === 403) {
+      throw new Error('No autorizado - Verifica tu API Key o permisos');
+    }
+    
     if (response.status === 429) {
-      console.error('⚠️ Rate limit excedido');
       throw new Error('Demasiadas solicitudes - Intenta más tarde');
     }
     
-    // Manejar otros errores HTTP
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -86,7 +212,10 @@ async function secureFetch(url, options = {}) {
   }
 }
 
-// Helper para mostrar notificaciones
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
 function showNotification(message, type = 'success') {
   const alertDiv = document.createElement('div');
   alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
@@ -98,23 +227,21 @@ function showNotification(message, type = 'success') {
   `;
   document.body.appendChild(alertDiv);
   
-  setTimeout(() => {
-    alertDiv.remove();
-  }, 5000);
+  setTimeout(() => alertDiv.remove(), 5000);
 }
 
-// Helper para formatear precios
 function formatPrice(price) {
   return `$${parseFloat(price).toFixed(2)}`;
 }
 
-// Helper para manejar errores de API
 function handleError(error, context = '') {
   console.error(`Error en ${context}:`, error);
   let message = 'Ocurrió un error. Por favor, intenta de nuevo.';
   
-  if (error.response) {
-    message = error.response.data?.error || error.response.data?.message || message;
+  if (error.response?.data?.message) {
+    message = error.response.data.message;
+  } else if (error.response?.data?.error) {
+    message = error.response.data.error;
   } else if (error.message) {
     message = error.message;
   }
@@ -122,7 +249,6 @@ function handleError(error, context = '') {
   showNotification(message, 'danger');
 }
 
-// Helper para mostrar loading
 function showLoading(elementId) {
   const element = document.getElementById(elementId);
   if (element) {
@@ -137,7 +263,6 @@ function showLoading(elementId) {
   }
 }
 
-// Helper para obtener badge de stock
 function getStockBadge(stock) {
   if (stock > 10) return '<span class="badge bg-success">Disponible</span>';
   if (stock > 5) return '<span class="badge bg-warning text-dark">Poco Stock</span>';
@@ -145,7 +270,6 @@ function getStockBadge(stock) {
   return '<span class="badge bg-secondary">Sin Stock</span>';
 }
 
-// Helper para formatear specs de componentes
 function formatSpecs(specs) {
   if (!specs) return '';
   return Object.entries(specs)
@@ -154,11 +278,11 @@ function formatSpecs(specs) {
 }
 
 // ==========================================
-// CARRITO DE COMPRAS EN MEMORIA
+// CARRITO DE COMPRAS (SIN CAMBIOS)
 // ==========================================
+
 let cart = [];
 
-// Agregar item al carrito
 function addToCart(configId, configName, configPrice) {
   const existingItem = cart.find(item => item.configId === configId);
   
@@ -179,7 +303,6 @@ function addToCart(configId, configName, configPrice) {
   saveCartToLocalStorage();
 }
 
-// Eliminar item del carrito
 function removeFromCart(configId) {
   const index = cart.findIndex(item => item.configId === configId);
   if (index > -1) {
@@ -192,7 +315,6 @@ function removeFromCart(configId) {
   }
 }
 
-// Actualizar cantidad en el carrito
 function updateCartQuantity(configId, newQuantity) {
   const item = cart.find(item => item.configId === configId);
   if (item) {
@@ -203,7 +325,6 @@ function updateCartQuantity(configId, newQuantity) {
   }
 }
 
-// Vaciar carrito
 function clearCart() {
   cart = [];
   updateCartBadge();
@@ -211,7 +332,6 @@ function clearCart() {
   showNotification('Carrito vaciado', 'info');
 }
 
-// Actualizar badge del carrito
 function updateCartBadge() {
   const badge = document.getElementById('cartBadge');
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -226,17 +346,14 @@ function updateCartBadge() {
   }
 }
 
-// Calcular total del carrito
 function getCartTotal() {
   return cart.reduce((sum, item) => sum + (item.configPrice * item.quantity), 0);
 }
 
-// Guardar carrito en localStorage
 function saveCartToLocalStorage() {
   localStorage.setItem('appCarritoCart', JSON.stringify(cart));
 }
 
-// Cargar carrito desde localStorage
 function loadCartFromLocalStorage() {
   const saved = localStorage.getItem('appCarritoCart');
   if (saved) {
