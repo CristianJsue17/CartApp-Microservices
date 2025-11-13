@@ -299,10 +299,9 @@ exports.getOrderById = async (req, res) => {
 };
 
 /**
- * Obtener todas las órdenes del usuario autenticado,  o todas las órdenes (admin)
+ * Obtener todas las órdenes del usuario autenticado, o todas las órdenes (admin)
  * GET /api/orders
  */
-// ⭐ MODIFICADO: Permitir a usuarios ver sus propias órdenes
 exports.getAllOrders = async (req, res) => {
   try {
     const userIdFromToken = req.user.userId;
@@ -340,18 +339,21 @@ exports.getAllOrders = async (req, res) => {
       result = await dynamoDB.scan(params).promise();
     }
 
-    const orders = result.Items.map(item => ({
-      orderId: item.orderId,
-      userId: item.PK.replace('USER#', ''),
-      configId: item.configId,
-      configName: item.configName,
-      quantity: item.quantity,
-      totalPrice: item.totalPrice,
-      status: item.status,
-      createdAt: item.createdAt,
-      PK: item.PK,
-      SK: item.SK
-    }));
+    // ⭐ FILTRAR: Solo items con Type = 'order' (excluir order_components)
+    const orders = result.Items
+      .filter(item => item.Type === 'order')  // ⭐ AGREGAR ESTA LÍNEA
+      .map(item => ({
+        orderId: item.orderId,
+        userId: item.PK.replace('USER#', ''),
+        configId: item.configId,
+        configName: item.configName,
+        quantity: item.quantity,
+        totalPrice: item.totalPrice,
+        status: item.status,
+        createdAt: item.createdAt,
+        PK: item.PK,
+        SK: item.SK
+      }));
 
     res.json({
       success: true,
