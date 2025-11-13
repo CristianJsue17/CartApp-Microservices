@@ -3,19 +3,19 @@ const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
 
-// Rutas PROTEGIDAS para usuarios autenticados
 // Crear orden (descuenta stock automáticamente) - Usuario autenticado
 router.post('/', authenticateToken, orderController.createOrder);
 
-// Obtener orden específica por ID - Usuario autenticado (solo sus órdenes)
-router.get('/:orderId', authenticateToken, orderController.getOrderById);
+// ⭐ ACTUALIZADO: Obtener todas las órdenes
+// - Usuarios normales: ven solo sus órdenes
+// - Admins: ven todas las órdenes
+// La lógica de permisos está en el controller
+router.get('/', authenticateToken, orderController.getAllOrders);
 
 // Obtener órdenes por usuario - Usuario autenticado (solo sus órdenes)
 router.get('/user/:userId', authenticateToken, orderController.getOrdersByUser);
 
-
-// Rutas PROTEGIDAS solo para ADMIN
-// Obtener todas las órdenes - SOLO ADMIN puede ver todas las órdenes
-router.get('/', authenticateToken, requireAdmin, orderController.getAllOrders);
+// Obtener orden específica por ID - Usuario autenticado (solo sus órdenes)
+router.get('/:orderId', authenticateToken, orderController.getOrderById);
 
 module.exports = router;
