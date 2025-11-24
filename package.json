@@ -1,23 +1,38 @@
 {
-  "name": "app-carrito",
+  "name": "cartapp-microservices",
   "version": "1.0.0",
   "description": "Sistema de carrito de compras con microservicios",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "setup": "npm install && cd catalog-service && npm install && cd ../cart-service && npm install && cd ../order-service && npm install",
+    "setup": "npm install && cd auth-service && npm install && cd ../catalog-service && npm install && cd ../cart-service && npm install && cd ../order-service && npm install",
+    "install:all": "cd auth-service && npm install && cd ../catalog-service && npm install && cd ../cart-service && npm install && cd ../order-service && npm install",
     "create-table": "node create-dynamodb-table.js",
     "seed-data": "node seed-data.js",
+    "start:auth": "cd auth-service && npm start",
     "start:catalog": "cd catalog-service && npm start",
     "start:cart": "cd cart-service && npm start",
     "start:order": "cd order-service && npm start",
+    "dev:auth": "cd auth-service && npm run dev",
     "dev:catalog": "cd catalog-service && npm run dev",
     "dev:cart": "cd cart-service && npm run dev",
-    "dev:order": "cd order-service && npm run dev"
+    "dev:order": "cd order-service && npm run dev",
+    "test": "jest --coverage",
+    "test:auth": "jest tests/unit/auth.test.js",
+    "test:catalog": "jest tests/unit/catalog.test.js",
+    "test:cart": "jest tests/unit/cart.test.js",
+    "test:order": "jest tests/unit/order.test.js",
+    "test:decision-tables": "jest tests/decision-tables/",
+    "test:watch": "jest --watch"
   },
-  "keywords": ["microservices", "ecommerce", "dynamodb", "nodejs"],
+  "keywords": ["microservices", "ecommerce", "dynamodb", "nodejs", "aws", "terraform"],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "aws-sdk": "^2.1400.0"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "supertest": "^6.3.0"
   }
 }

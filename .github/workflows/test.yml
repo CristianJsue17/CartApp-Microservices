@@ -1,0 +1,40 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [ main, aws-apiGateway-apiKey-cors-JWT ]
+  push:
+    branches: [ main, aws-apiGateway-apiKey-cors-JWT ]
+
+jobs:
+  test:
+    name: Run Unit & Decision Table Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install root dependencies
+      run: npm install
+    
+    - name: Install service dependencies
+      run: |
+        cd auth-service && npm install && cd ..
+        cd catalog-service && npm install && cd ..
+        cd cart-service && npm install && cd ..
+        cd order-service && npm install && cd ..
+    
+    - name: Run all tests
+      run: npm test
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage/lcov.info

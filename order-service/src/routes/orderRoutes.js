@@ -6,7 +6,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/authMiddlewar
 // Crear orden (descuenta stock automáticamente) - Usuario autenticado
 router.post('/', authenticateToken, orderController.createOrder);
 
-// ⭐ ACTUALIZADO: Obtener todas las órdenes
+//  ACTUALIZADO: Obtener todas las órdenes
 // - Usuarios normales: ven solo sus órdenes
 // - Admins: ven todas las órdenes
 // La lógica de permisos está en el controller

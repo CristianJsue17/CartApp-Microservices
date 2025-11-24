@@ -341,7 +341,7 @@ exports.getAllOrders = async (req, res) => {
 
     // ⭐ FILTRAR: Solo items con Type = 'order' (excluir order_components)
     const orders = result.Items
-      .filter(item => item.Type === 'order')  // ⭐ AGREGAR ESTA LÍNEA
+      .filter(item => item.Type === 'order')  // para filtrar solo órdenes y no sus componentes
       .map(item => ({
         orderId: item.orderId,
         userId: item.PK.replace('USER#', ''),

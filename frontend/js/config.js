@@ -3,8 +3,8 @@
 // ==========================================
 
 const API_CONFIG = {
-  GATEWAY: 'https://7wnjqd5red.execute-api.us-east-1.amazonaws.com/prod/api',
-  API_KEY: 'sDhPu2zQbV3uVspqFy04p6fx53eKfLH38kAee4x3' // Tu API Key completa
+  GATEWAY: 'https://jrxn957vng.execute-api.us-east-1.amazonaws.com/prod/api',
+  API_KEY: '6TrvvK9Hlf819UQfYlQif59HQVcA1dsN3qWZTvGp' // API Key completa
 };
 
 // ==========================================

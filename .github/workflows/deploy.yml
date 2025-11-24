@@ -1,0 +1,68 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches: [ aws-apiGateway-apiKey-cors-JWT ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: |
+        npm install
+        cd auth-service && npm install && cd ..
+        cd catalog-service && npm install && cd ..
+        cd cart-service && npm install && cd ..
+        cd order-service && npm install && cd ..
+    
+    - name: Run tests
+      run: npm test
+    
+    # ❌ Si tests fallan, aquí se detiene el workflow
+
+  deploy:
+    name: Deploy to EC2
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to EC2
+      run: |
+        chmod +x scripts/deploy.sh
+        ./scripts/deploy.sh ${{ secrets.EC2_HOST }}
+    
+    - name: Health Check
+      run: |
+        chmod +x scripts/health-check.sh
+        ./scripts/health-check.sh ${{ secrets.EC2_HOST }}
+    
+    - name: Notify Success
+      if: success()
+      run: echo "✅ Deployment successful!"
+    
+    - name: Notify Failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        exit 1

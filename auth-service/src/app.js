@@ -7,7 +7,7 @@ const authRoutes = require('./routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || 3004;
 
-// ⭐ CORS Configuration para API Gateway
+//  CORS Configuration para API Gateway
 const corsOptions = {
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
