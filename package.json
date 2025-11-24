@@ -28,7 +28,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aws-sdk": "^2.1400.0"
+    "aws-sdk": "^2.1400.0",
+    "bcryptjs": "^2.4.3"
   },
   "devDependencies": {
     "jest": "^29.7.0",
