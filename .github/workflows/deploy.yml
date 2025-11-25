@@ -1,66 +1,68 @@
-#!/bin/bash
+name: Deploy to AWS EC2
 
-set -e
+on:
+  push:
+    branches: [ aws-apiGateway-apiKey-cors-JWT ]
 
-EC2_USER="ubuntu"
-EC2_HOST=$1
-APP_DIR="/home/ubuntu/apps/app-carrito"
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    
+    - name: Install dependencies
+      run: |
+        npm install
+        cd auth-service && npm install && cd ..
+        cd catalog-service && npm install && cd ..
+        cd cart-service && npm install && cd ..
+        cd order-service && npm install && cd ..
+    
+    - name: Run tests
+      run: npm test
+    
+    # ❌ Si tests fallan, aquí se detiene el workflow
 
-if [ -z "$EC2_HOST" ]; then
-  echo "❌ Error: EC2_HOST is required"
-  echo "Usage: ./deploy.sh <EC2_IP>"
-  exit 1
-fi
-
-echo "🚀 Starting deployment to $EC2_HOST..."
-
-# SSH y ejecutar comandos con debugging
-ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} << 'ENDSSH'
-  set -e
-  set -x  # ⭐ Mostrar comandos mientras se ejecutan
-  
-  # Verificar que el directorio existe
-  if [ ! -d "/home/ubuntu/apps/app-carrito" ]; then
-    echo "❌ Directory /home/ubuntu/apps/app-carrito does not exist!"
-    exit 1
-  fi
-  
-  cd /home/ubuntu/apps/app-carrito
-  
-  echo "📥 Pulling latest code..."
-  git fetch origin
-  git checkout aws-apiGateway-apiKey-cors-JWT
-  git reset --hard origin/aws-apiGateway-apiKey-cors-JWT
-  
-  echo "📦 Installing dependencies..."
-  cd auth-service && npm install --production && cd ..
-  cd catalog-service && npm install --production && cd ..
-  cd cart-service && npm install --production && cd ..
-  cd order-service && npm install --production && cd ..
-  
-  echo "🔄 Reloading services with PM2..."
-  
-  # Verificar que PM2 existe
-  which pm2 || { echo "❌ PM2 not found!"; exit 1; }
-  
-  pm2 reload auth-service --update-env || pm2 restart auth-service || echo "⚠️ auth-service failed"
-  sleep 2
-  pm2 reload catalog-service --update-env || pm2 restart catalog-service || echo "⚠️ catalog-service failed"
-  sleep 2
-  pm2 reload cart-service --update-env || pm2 restart cart-service || echo "⚠️ cart-service failed"
-  sleep 2
-  pm2 reload order-service --update-env || pm2 restart order-service || echo "⚠️ order-service failed"
-  sleep 2
-  
-  echo "📊 Service status:"
-  pm2 list
-  
-  echo "✅ Deployment complete!"
-ENDSSH
-
-if [ $? -eq 0 ]; then
-  echo "🎉 All services deployed successfully!"
-else
-  echo "❌ Deployment failed with exit code $?"
-  exit 1
-fi
+  deploy:
+    name: Deploy to EC2
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to EC2
+      run: |
+        chmod +x scripts/deploy.sh
+        ./scripts/deploy.sh ${{ secrets.EC2_HOST }}
+    
+    - name: Health Check
+      run: |
+        chmod +x scripts/health-check.sh
+        ./scripts/health-check.sh ${{ secrets.EC2_HOST }}
+    
+    - name: Notify Success
+      if: success()
+      run: echo "✅ Deployment successful!"
+    
+    - name: Notify Failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        exit 1
