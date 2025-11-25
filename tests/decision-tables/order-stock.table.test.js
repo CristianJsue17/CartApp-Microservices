@@ -37,7 +37,7 @@ describe('Order Service - Decision Table: CREATE ORDER', () => {
     expect(stockSufficient).toBe(true);
     expect(userAuthenticated).toBe(true);
     expect(quantity).toBeGreaterThan(0);
-    // Resultado esperado: A1 (Orden creada, stock = 40)
+    // Resultado esperado: A1 (Orden creada, stock = 40) hs
   });
 
   // R2: Stock insuficiente → Error 400 con detalles

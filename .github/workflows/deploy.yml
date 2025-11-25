@@ -29,7 +29,7 @@ jobs:
     - name: Run tests
       run: npm test
     
-    # ❌ Si tests fallan, aquí se detiene el workflow
+    #  Si tests fallan, aquí se detiene el workflow
 
   deploy:
     name: Deploy to EC2
@@ -59,10 +59,10 @@ jobs:
     
     - name: Notify Success
       if: success()
-      run: echo "✅ Deployment successful!"
+      run: echo " Deployment successful!"
     
     - name: Notify Failure
       if: failure()
       run: |
-        echo "❌ Deployment failed!"
+        echo " Deployment failed!"
         exit 1
